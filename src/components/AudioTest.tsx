@@ -15,7 +15,7 @@ export default function AudioTest() {
     // Check if getUserMedia is supported
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setIsSupported(false);
-      setError('Ваш браузер не підтримує доступ до мікрофона');
+      setError('Your browser does not support microphone access');
       return;
     }
 
@@ -89,13 +89,13 @@ export default function AudioTest() {
     } catch (err: any) {
       console.error('Audio test failed:', err);
       if (err.name === 'NotAllowedError') {
-        setError('Дозвіл на використання мікрофона не надано');
+        setError('Microphone permission was not granted');
       } else if (err.name === 'NotFoundError') {
-        setError('Мікрофон не знайдено');
+        setError('Microphone not found');
       } else if (err.name === 'NotReadableError') {
-        setError('Мікрофон використовується іншою програмою');
+        setError('Microphone is in use by another application');
       } else {
-        setError(`Помилка: ${err.message || 'Невідома помилка'}`);
+        setError(`Error: ${err.message || 'Unknown error'}`);
       }
     }
   };
@@ -119,7 +119,7 @@ export default function AudioTest() {
   if (!isSupported) {
     return (
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-        <h3 className="font-semibold mb-2">Аудіо не підтримується</h3>
+        <h3 className="font-semibold mb-2">Audio is not supported</h3>
         <p>{error}</p>
       </div>
     );
@@ -127,7 +127,7 @@ export default function AudioTest() {
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
-      <h3 className="text-lg font-semibold mb-4">Тест мікрофона</h3>
+      <h3 className="text-lg font-semibold mb-4">Microphone Test</h3>
       
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -145,11 +145,11 @@ export default function AudioTest() {
                 : 'bg-green-500 hover:bg-green-600 text-white'
             }`}
           >
-            {isRecording ? 'Зупинити тест' : 'Почати тест'}
+            {isRecording ? 'Stop Test' : 'Start Test'}
           </button>
           
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Рівень звуку:</span>
+            <span className="text-sm text-gray-600">Sound level:</span>
             <div className="w-32 h-4 bg-gray-200 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-green-500 transition-all duration-100"
@@ -164,18 +164,18 @@ export default function AudioTest() {
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              <span>Мікрофон активний - говорите для тестування</span>
+              <span>Microphone is active - speak to test</span>
             </div>
           </div>
         )}
 
         <div className="text-sm text-gray-600">
-          <p><strong>Інструкції:</strong></p>
+          <p><strong>Instructions:</strong></p>
           <ul className="list-disc list-inside mt-2 space-y-1">
-            <li>Натисніть "Почати тест" для перевірки мікрофона</li>
-            <li>Дозвольте доступ до мікрофона, якщо браузер запитає</li>
-            <li>Говоріть у мікрофон - рівень звуку повинен змінюватися</li>
-            <li>Якщо рівень звуку залишається на 0, перевірте налаштування мікрофона</li>
+            <li>Click "Start Test" to check your microphone</li>
+            <li>Allow microphone access when prompted by the browser</li>
+            <li>Speak into the mic - the level should change</li>
+            <li>If the level stays at 0, check your microphone settings</li>
           </ul>
         </div>
       </div>

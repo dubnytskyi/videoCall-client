@@ -34,13 +34,13 @@ export default function CameraTest() {
     } catch (err: any) {
       console.error('Camera test failed:', err);
       if (err.name === 'NotAllowedError') {
-        setError('Дозвіл на використання камери не надано');
+        setError('Camera permission was not granted');
       } else if (err.name === 'NotFoundError') {
-        setError('Камера не знайдена');
+        setError('Camera not found');
       } else if (err.name === 'NotReadableError') {
-        setError('Камера використовується іншою програмою');
+        setError('Camera is in use by another application');
       } else {
-        setError(`Помилка: ${err.message || 'Невідома помилка'}`);
+        setError(`Error: ${err.message || 'Unknown error'}`);
       }
     }
   };
@@ -66,7 +66,7 @@ export default function CameraTest() {
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
-      <h3 className="text-lg font-semibold mb-4">Тест камери</h3>
+      <h3 className="text-lg font-semibold mb-4">Camera Test</h3>
       
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -84,7 +84,7 @@ export default function CameraTest() {
                 : 'bg-green-500 hover:bg-green-600 text-white'
             }`}
           >
-            {isActive ? 'Зупинити тест' : 'Почати тест'}
+            {isActive ? 'Stop Test' : 'Start Test'}
           </button>
         </div>
 
@@ -92,7 +92,7 @@ export default function CameraTest() {
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              <span>Камера активна</span>
+              <span>Camera is active</span>
             </div>
           </div>
         )}
@@ -108,19 +108,19 @@ export default function CameraTest() {
             <div className="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg">
               <div className="text-center text-gray-500">
                 <div className="text-4xl mb-2">📹</div>
-                <p>Камера не активна</p>
+                <p>Camera is not active</p>
               </div>
             </div>
           )}
         </div>
 
         <div className="text-sm text-gray-600">
-          <p><strong>Інструкції:</strong></p>
+          <p><strong>Instructions:</strong></p>
           <ul className="list-disc list-inside mt-2 space-y-1">
-            <li>Натисніть "Почати тест" для перевірки камери</li>
-            <li>Дозвольте доступ до камери, якщо браузер запитає</li>
-            <li>Якщо камера працює, ви побачите своє відео</li>
-            <li>Якщо відео чорне або не відображається, перевірте налаштування камери</li>
+            <li>Click "Start Test" to check your camera</li>
+            <li>Allow camera access when prompted by the browser</li>
+            <li>If the camera works, you should see your video</li>
+            <li>If the video is black or not visible, check camera settings</li>
           </ul>
         </div>
       </div>

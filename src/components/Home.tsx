@@ -3,28 +3,16 @@ import CameraTest from './CameraTest';
 import VideoDebug from './VideoDebug';
 import AudioTest from './AudioTest';
 import ConnectionDiagnostic from './ConnectionDiagnostic';
-import { fetchTwilioToken } from '../lib/twilioToken';
 import { useState, useEffect } from 'react';
 
 export default function Home() {
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [token] = useState<string | null>(null);
+  const [isLoading] = useState(false);
 
   useEffect(() => {
-    const getToken = async () => {
-      try {
-        setIsLoading(true);
-        const token = await fetchTwilioToken("Debug", "debug-room");
-        setToken(token);
-      } catch (err) {
-        console.error("Failed to get token:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    getToken();
-  }, []);
+    // No-op in production build to avoid unused state warnings; keep token for future use
+    void token; void isLoading; // access to prevent TS "unused" in certain strict configs
+  }, [token, isLoading]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">

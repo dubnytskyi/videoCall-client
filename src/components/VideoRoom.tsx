@@ -444,10 +444,10 @@ export default function VideoRoom({
         <div className="flex items-center justify-between">
           <div>
             <span className="font-semibold">
-              Стан з'єднання: {isConnected ? 'Підключено' : 'Відключено'}
+              Connection Status: {isConnected ? 'Connected' : 'Disconnected'}
             </span>
             <p className="text-sm mt-1">
-              {isConnected ? 'З\'єднання активне' : 'З\'єднання втрачено'}
+              {isConnected ? 'Connection is active' : 'Connection lost'}
             </p>
           </div>
         </div>
@@ -577,7 +577,7 @@ export default function VideoRoom({
           <div className="flex items-center gap-2">
             <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
             <span className="text-sm font-medium text-gray-700">
-              {isConnected ? 'Підключено' : 'Відключено'}
+              {isConnected ? 'Connected' : 'Disconnected'}
             </span>
             <span className="text-xs text-gray-500">
               ({identity})
@@ -588,18 +588,18 @@ export default function VideoRoom({
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium"
           >
-            Перезавантажити сторінку
+            Reload Page
           </button>
         </div>
         
         {!isConnected && (
           <div className="mt-2 text-sm text-gray-600">
-            <p>Якщо виникають проблеми з підключенням:</p>
+            <p>If you experience connection issues:</p>
             <ul className="list-disc list-inside mt-1 space-y-1">
-              <li>Перезавантажте сторінку</li>
-              <li>Перевірте інтернет-з'єднання</li>
-              <li>Дозвольте доступ до камери та мікрофона</li>
-              <li>Переконайтеся, що камера не використовується іншою програмою</li>
+              <li>Reload the page</li>
+              <li>Check your internet connection</li>
+              <li>Allow camera and microphone access</li>
+              <li>Ensure the camera is not used by another app</li>
             </ul>
           </div>
         )}

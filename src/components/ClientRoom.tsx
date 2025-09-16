@@ -22,16 +22,18 @@ export default function ClientRoom() {
   const identityRef = useRef<string | null>(null);
   
   // Initialize identity only once
-  if (!identityRef.current) {
-    identityRef.current = `client-${Math.random().toString(36).substr(2, 9)}`;
-    console.log(`[ClientRoom] Created identity: ${identityRef.current}`);
-  }
+  useEffect(() => {
+    if (!identityRef.current) {
+      identityRef.current = `client-${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`[ClientRoom] Created identity: ${identityRef.current}`);
+    }
+  }, []);
 
   useEffect(() => {
     const getToken = async () => {
       try {
         setIsLoading(true);
-        const token = await fetchTwilioToken(identityRef.current, "notary-room");
+        const token = await fetchTwilioToken(identityRef.current as string, "notary-room");
         setToken(token);
       } catch (err) {
         console.error("Failed to get token:", err);

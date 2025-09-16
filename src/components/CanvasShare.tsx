@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import { createLocalVideoTrack } from "twilio-video";
+import { LocalVideoTrack } from "twilio-video";
 
 type Props = {
   isNotary: boolean;
@@ -23,11 +23,9 @@ export default function CanvasShare({ isNotary, onCanvasTrack, onStopSharing, pd
       const stream = canvasRef.current.captureStream(30); // 30 FPS
       streamRef.current = stream;
 
-      // Create video track from canvas stream
-      const videoTrack = await createLocalVideoTrack({
-        mediaStream: stream,
-        name: 'canvas-share'
-      });
+      // Create Twilio LocalVideoTrack from the captured MediaStream
+      const canvasMediaTrack = stream.getVideoTracks()[0];
+      const videoTrack = new LocalVideoTrack(canvasMediaTrack, { name: 'canvas-share' });
 
       setTrack(videoTrack);
       setIsSharing(true);

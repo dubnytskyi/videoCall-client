@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { fetchTwilioToken } from '../lib/twilioToken';
 
 interface DiagnosticResult {
@@ -23,7 +23,7 @@ export default function ConnectionDiagnostic() {
     // Test 1: Basic connectivity
     addResult('Internet Connection', 'success', 'Checking internet connectivity...');
     try {
-      const response = await fetch('https://www.google.com', { mode: 'no-cors' });
+      await fetch('https://www.google.com', { mode: 'no-cors' });
       addResult('Internet Connection', 'success', 'Internet connection is working');
     } catch (error) {
       addResult('Internet Connection', 'error', 'No internet connection detected');
@@ -63,7 +63,7 @@ export default function ConnectionDiagnostic() {
     // Test 5: Media devices access
     addResult('Media Devices', 'success', 'Checking media device access...');
     try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      if (typeof navigator !== 'undefined' && !!navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
         addResult('Media Devices', 'success', 'Media devices API is available');
       } else {
         addResult('Media Devices', 'error', 'Media devices API is not available');
@@ -89,7 +89,7 @@ export default function ConnectionDiagnostic() {
     addResult('Twilio Servers', 'success', 'Testing connectivity to Twilio servers...');
     try {
       const startTime = Date.now();
-      const response = await fetch('https://global.vss.twilio.com/signaling', { 
+      await fetch('https://global.vss.twilio.com/signaling', { 
         method: 'HEAD',
         mode: 'no-cors'
       });
@@ -129,7 +129,7 @@ export default function ConnectionDiagnostic() {
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Діагностика з'єднання</h3>
+        <h3 className="text-lg font-semibold">Connection Diagnostics</h3>
         <button
           onClick={runDiagnostics}
           disabled={isRunning}
@@ -139,7 +139,7 @@ export default function ConnectionDiagnostic() {
               : 'bg-blue-500 hover:bg-blue-600 text-white'
           }`}
         >
-          {isRunning ? 'Виконується...' : 'Запустити діагностику'}
+          {isRunning ? 'Running...' : 'Start Diagnostics'}
         </button>
       </div>
 
@@ -158,7 +158,7 @@ export default function ConnectionDiagnostic() {
                 <p className="text-sm text-gray-600 mt-1">{result.message}</p>
                 {result.details && (
                   <details className="mt-2">
-                    <summary className="text-xs text-gray-500 cursor-pointer">Деталі</summary>
+                    <summary className="text-xs text-gray-500 cursor-pointer">Details</summary>
                     <pre className="text-xs bg-gray-100 p-2 rounded mt-1 overflow-auto">
                       {JSON.stringify(result.details, null, 2)}
                     </pre>
@@ -172,24 +172,24 @@ export default function ConnectionDiagnostic() {
 
       {results.length === 0 && !isRunning && (
         <div className="text-center text-gray-500 py-8">
-          <p>Натисніть "Запустити діагностику" для перевірки з'єднання</p>
+          <p>Click "Start Diagnostics" to test your connection</p>
         </div>
       )}
 
       {isRunning && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Виконується діагностика...</p>
+          <p className="text-gray-600">Diagnostics are running...</p>
         </div>
       )}
 
       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <h4 className="font-semibold text-blue-800 mb-2">Рекомендації:</h4>
+        <h4 className="font-semibold text-blue-800 mb-2">Recommendations:</h4>
         <ul className="text-sm text-blue-700 space-y-1">
-          <li>• Переконайтеся, що у вас стабільне інтернет-з'єднання</li>
-          <li>• Перевірте налаштування файрволу та проксі</li>
-          <li>• Переконайтеся, що Twilio credentials налаштовані правильно</li>
-          <li>• Спробуйте використовувати інший браузер або мережу</li>
+          <li>• Ensure you have a stable internet connection</li>
+          <li>• Check firewall and proxy settings</li>
+          <li>• Ensure Twilio credentials are configured correctly</li>
+          <li>• Try a different browser or network</li>
         </ul>
       </div>
     </div>
