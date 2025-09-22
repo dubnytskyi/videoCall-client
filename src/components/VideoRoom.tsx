@@ -7,6 +7,8 @@ import {
   RemoteParticipant,
 } from "twilio-video";
 import { CollabOp, Participant } from "../types/collab";
+import { getServerUrl } from "../config";
+import { recordingService, RecordingStatus } from "../lib/recordingService";
 
 type Props = {
   token: string;
@@ -16,6 +18,7 @@ type Props = {
   onRemoteData: (data: CollabOp) => void;
   onParticipantUpdate: (participant: Participant) => void;
   canvasTrack?: any;
+  onRecordingStatusChange?: (status: RecordingStatus | null) => void;
 };
 
 export default function VideoRoom({ 
@@ -25,7 +28,8 @@ export default function VideoRoom({
   onLocalDataTrack, 
   onRemoteData, 
   onParticipantUpdate,
-  canvasTrack
+  canvasTrack,
+  onRecordingStatusChange
 }: Props) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -41,6 +45,11 @@ export default function VideoRoom({
   const [isConnecting, setIsConnecting] = useState(false);
   const isConnectingRef = useRef(false);
   const connectedOnceRef = useRef(false);
+  
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
 
   // Store callback functions in refs to avoid dependency issues
   const onLocalDataTrackRef = useRef(onLocalDataTrack);
@@ -105,10 +114,86 @@ export default function VideoRoom({
     }
   }, []);
 
+  // Simple freeze monitor for HTMLVideoElement
+  const startFreezeMonitor = useCallback((videoEl: HTMLVideoElement, reattach: () => void) => {
+    let lastTime = videoEl.currentTime;
+    let lastCheck = Date.now();
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      const time = videoEl.currentTime;
+      const elapsed = now - lastCheck;
+      // If >3s elapsed and currentTime did not advance while not paused, consider frozen
+      if (!videoEl.paused && !videoEl.ended && elapsed > 3000 && Math.abs(time - lastTime) < 0.05) {
+        console.warn('[VideoRoom] Detected frozen remote video element. Reattaching track...');
+        try { reattach(); } catch {}
+      }
+      lastTime = time;
+      lastCheck = now;
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   // Toggle volume control
   const toggleVolumeControl = useCallback(() => {
     setIsVolumeControlVisible(!isVolumeControlVisible);
   }, [isVolumeControlVisible]);
+
+  // Recording functions
+  const setRecordingRules = useCallback(async (roomSid: string, rules: any[]) => {
+    try {
+      await fetch(`${getServerUrl()}/api/room/${roomSid}/recording-rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rules })
+      });
+    } catch (e) {
+      console.warn('[VideoRoom] Failed to update recording rules', e);
+    }
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (!room || isRecording) return;
+
+    try {
+      setRecordingError(null);
+      console.log(`[${identity}] Starting recording for room:`, room.sid);
+      
+      const status = await recordingService.startRecording(room.sid);
+      setRecordingStatus(status);
+      setIsRecording(true);
+      
+      if (onRecordingStatusChange) {
+        onRecordingStatusChange(status);
+      }
+      
+      console.log(`[${identity}] Recording started successfully:`, status);
+    } catch (error) {
+      console.error(`[${identity}] Failed to start recording:`, error);
+      setRecordingError(error instanceof Error ? error.message : 'Failed to start recording');
+    }
+  }, [room, isRecording, identity, onRecordingStatusChange]);
+
+  const stopRecording = useCallback(async () => {
+    if (!isRecording || !recordingStatus) return;
+
+    try {
+      setRecordingError(null);
+      console.log(`[${identity}] Stopping recording:`, recordingStatus.recordingSid);
+      
+      const status = await recordingService.stopRecording();
+      setRecordingStatus(status);
+      setIsRecording(false);
+      
+      if (onRecordingStatusChange) {
+        onRecordingStatusChange(status);
+      }
+      
+      console.log(`[${identity}] Recording stopped successfully:`, status);
+    } catch (error) {
+      console.error(`[${identity}] Failed to stop recording:`, error);
+      setRecordingError(error instanceof Error ? error.message : 'Failed to stop recording');
+    }
+  }, [isRecording, recordingStatus, identity, onRecordingStatusChange]);
 
   useEffect(() => {
     let mounted = true;
@@ -137,33 +222,23 @@ export default function VideoRoom({
         setIsConnecting(true);
         isConnectingRef.current = true;
 
-        // Create video track with fallback
+        // Create video track with conservative defaults for stability (can upscale later)
         let videoTrack;
         try {
           videoTrack = await createLocalVideoTrack({
-            width: 1280,
-            height: 720,
-            frameRate: 30,
+            width: 640,
+            height: 360,
+            frameRate: 24,
           });
-          console.log(`[${identity}] Video track created successfully`);
+          console.log(`[${identity}] Video track created successfully (640x360@24)`);
         } catch (videoError) {
-          console.warn(`[${identity}] High quality video failed, trying medium quality:`, videoError);
-          try {
-            videoTrack = await createLocalVideoTrack({
-              width: 640,
-              height: 480,
-              frameRate: 24,
-            });
-            console.log(`[${identity}] Medium quality video created successfully`);
-          } catch (videoError2) {
-            console.warn(`[${identity}] Medium quality video failed, trying low quality:`, videoError2);
-            videoTrack = await createLocalVideoTrack({
+          console.warn(`[${identity}] 640x360@24 failed, trying 320x240@15:`, videoError);
+          videoTrack = await createLocalVideoTrack({
             width: 320,
             height: 240,
-              frameRate: 15,
-            });
-            console.log(`[${identity}] Low quality video created successfully`);
-          }
+            frameRate: 15,
+          });
+          console.log(`[${identity}] Video track created successfully (320x240@15)`);
         }
 
         // Create audio track with fallback
@@ -196,6 +271,20 @@ export default function VideoRoom({
         const roomInstance: any = await connect(token, {
           name: "notary-room",
           tracks,
+          // Improve stability and quality
+          bandwidthProfile: {
+            video: {
+              mode: 'collaboration',
+              trackSwitchOffMode: 'detected',
+              contentPreferencesMode: 'auto',
+              maxSubscriptionBitrate: 800000,
+            }
+          } as any,
+          preferredVideoCodecs: [{ codec: 'H264', simulcast: false }] as any,
+          maxAudioBitrate: 32000,
+          dscpTagging: true,
+          networkQuality: { local: 2, remote: 2 },
+          dominantSpeaker: true,
         });
 
         if (!mounted) {
@@ -212,6 +301,12 @@ export default function VideoRoom({
         
         console.log(`[${identity}] Successfully connected to room`);
         console.log(`[${identity}] Local participant identity: ${roomInstance.localParticipant.identity}`);
+
+        // Ensure recording is disabled until user presses Start
+        try {
+          await setRecordingRules(roomInstance.sid, [{ type: 'exclude', all: true }]);
+          console.log(`[${identity}] Applied recording rules: exclude all`);
+        } catch {}
 
         // Display local video
         if (localVideoRef.current && videoTrack) {
@@ -274,6 +369,20 @@ export default function VideoRoom({
           participant.on('trackUnsubscribed', (track) => {
             handleTrackUnsubscribed(track);
           });
+
+          // React to Twilio adaptive track switching to avoid black frames
+          participant.on('trackSwitchedOff', (track: any) => {
+            console.warn(`[${identity}] Track switched OFF due to bandwidth:`, track?.kind);
+            if (track?.kind === 'video' && typeof track.setContentPreferences === 'function') {
+              try { track.setContentPreferences({ renderDimensions: { width: 320, height: 180 }, frameRate: 15 }); } catch {}
+            }
+          });
+          participant.on('trackSwitchedOn', (track: any) => {
+            console.log(`[${identity}] Track switched ON:`, track?.kind);
+            if (track?.kind === 'video' && typeof track.setContentPreferences === 'function') {
+              try { track.setContentPreferences({ renderDimensions: { width: 640, height: 360 }, frameRate: 24 }); } catch {}
+            }
+          });
         };
 
         const handleTrackSubscribed = (track: any, participant: RemoteParticipant) => {
@@ -287,12 +396,37 @@ export default function VideoRoom({
 
           if (track.kind === 'video' && remoteVideoRef.current && track.mediaStreamTrack) {
             console.log(`[${identity}] Setting up remote video display - track:`, track);
-            remoteVideoRef.current.srcObject = new MediaStream([track.mediaStreamTrack]);
+            const attach = () => {
+              remoteVideoRef.current!.srcObject = new MediaStream([track.mediaStreamTrack]);
+              // Hint to browser for smoother playback on mobile
+              remoteVideoRef.current!.playsInline = true;
+            };
+            attach();
             remoteVideoRef.current.play().then(() => {
               console.log(`[${identity}] Remote video playing successfully`);
             }).catch((err) => {
               console.error(`[${identity}] Failed to play remote video:`, err);
             });
+
+            // Prefer higher priority for the main remote video
+            if (typeof track.setPriority === 'function') {
+              try { track.setPriority('high'); } catch {}
+            }
+            // Request reasonable render dimensions/frame rate to improve stability
+            if (typeof track.setContentPreferences === 'function') {
+              try { track.setContentPreferences({ renderDimensions: { width: 640, height: 360 }, frameRate: 24 }); } catch {}
+            }
+
+            // Start freeze monitor - if frozen, reattach srcObject
+            const cleanupFreeze = startFreezeMonitor(remoteVideoRef.current, () => {
+              if (!remoteVideoRef.current) return;
+              remoteVideoRef.current.pause();
+              remoteVideoRef.current.srcObject = null;
+              attach();
+              remoteVideoRef.current.play().catch(() => {});
+            });
+            // Clean up monitor when track unsubscribes
+            track.once && track.once('unsubscribed', () => cleanupFreeze());
           } else if (track.kind === 'video') {
             console.warn(`[${identity}] Video track exists but no mediaStreamTrack or remoteVideoRef - track:`, track, 'remoteVideoRef:', !!remoteVideoRef.current, 'mediaStreamTrack:', !!track.mediaStreamTrack);
           }
@@ -368,6 +502,43 @@ export default function VideoRoom({
           } else {
             console.warn(`[${identity}] Disconnected for unknown reason: ${reason}`);
           }
+        });
+
+        // Handle reconnect events for visibility
+        roomInstance.on('reconnecting', (error: any) => {
+          console.warn(`[${identity}] Reconnecting due to:`, error?.message || error);
+        });
+        roomInstance.on('reconnected', () => {
+          console.log(`[${identity}] Reconnected to room`);
+        });
+
+        // Adapt local track based on network quality
+        roomInstance.on('networkQualityLevelChanged', (level: any, stats: any) => {
+          console.log(`[${identity}] Local network quality:`, level, stats);
+          try {
+            if (videoTrack && typeof (videoTrack as any).restart === 'function') {
+              if (level <= 1) {
+                // Very poor - minimize
+                (videoTrack as any).restart({ width: 320, height: 240, frameRate: 15 });
+              } else if (level === 2) {
+                (videoTrack as any).restart({ width: 640, height: 360, frameRate: 20 });
+              } else if (level >= 3) {
+                (videoTrack as any).restart({ width: 640, height: 360, frameRate: 24 });
+              }
+            }
+          } catch (e) {
+            console.warn(`[${identity}] Failed to adapt local video track:`, e);
+          }
+        });
+
+        // Optional: observe track switch events (bandwidth adaptation)
+        roomInstance.on('participantConnected', (p: any) => {
+          p.on('trackSwitchedOff', (track: any) => {
+            console.warn(`[${identity}] Track switched OFF due to bandwidth:`, track?.kind);
+          });
+          p.on('trackSwitchedOn', (track: any) => {
+            console.log(`[${identity}] Track switched ON:`, track?.kind);
+          });
         });
 
         // Publish canvas track if available
@@ -504,6 +675,34 @@ export default function VideoRoom({
               <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
             </svg>
           </button>
+
+          {/* Recording Controls - Only show for notary */}
+          {role === 'notary' && (
+            <>
+              {!isRecording ? (
+                <button
+                  onClick={startRecording}
+                  disabled={!isConnected}
+                  className="p-2 rounded-full bg-red-500 hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white"
+                  title="Start recording"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={stopRecording}
+                  className="p-2 rounded-full bg-red-600 hover:bg-red-700 text-white animate-pulse"
+                  title="Stop recording"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -604,6 +803,56 @@ export default function VideoRoom({
           </div>
         )}
       </div>
+
+      {/* Recording Status */}
+      {(isRecording || recordingStatus || recordingError) && (
+        <div className="bg-white rounded-lg shadow-lg p-4 mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-gray-800">Recording Status</h3>
+            {recordingStatus && (
+              <div className={`px-2 py-1 rounded text-xs font-medium ${
+                recordingStatus.status === 'in-progress' ? 'bg-red-100 text-red-800' :
+                recordingStatus.status === 'completed' ? 'bg-green-100 text-green-800' :
+                recordingStatus.status === 'failed' ? 'bg-red-100 text-red-800' :
+                recordingStatus.status === 'enqueued' ? 'bg-orange-100 text-orange-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {recordingStatus.status}
+              </div>
+            )}
+          </div>
+          
+          {recordingError && (
+            <div className="mb-2 p-2 bg-red-100 border border-red-300 rounded text-red-700 text-sm">
+              Error: {recordingError}
+            </div>
+          )}
+          
+          {recordingStatus && (
+            <div className="space-y-1 text-sm text-gray-600">
+              <div>Recording ID: {recordingStatus.recordingSid}</div>
+              {recordingStatus.duration && (
+                <div>Duration: {Math.floor(recordingStatus.duration / 60)}:{(recordingStatus.duration % 60).toString().padStart(2, '0')}</div>
+              )}
+              {recordingStatus.size && (
+                <div>Size: {(recordingStatus.size / 1024 / 1024).toFixed(2)} MB</div>
+              )}
+              {(recordingStatus.status === 'completed') && (
+                <div className="mt-2">
+                  <a 
+                    href={`${getServerUrl()}/api/recording/${recordingStatus.recordingSid}/media`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Download Recording
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Hidden Audio Elements */}
       <audio ref={localAudioRef} muted style={{ display: 'none' }} />

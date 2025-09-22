@@ -5,6 +5,8 @@ import PdfCollaborator from "./PdfCollaborator";
 import { fetchTwilioToken } from "../lib/twilioToken";
 import { CollabOp, Participant } from "../types/collab";
 import { LocalDataTrack } from "twilio-video";
+import { RecordingStatus } from "../lib/recordingService";
+import { getServerUrl } from "../config";
 
 export default function NotaryRoom() {
   const navigate = useNavigate();
@@ -16,6 +18,9 @@ export default function NotaryRoom() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
+  const [isEndingCall, setIsEndingCall] = useState(false);
+  const [isFinalizingRecording, setIsFinalizingRecording] = useState(false);
   
   // Stable identity that doesn't change on re-renders
   const identityRef = useRef<string | null>(null);
@@ -68,6 +73,54 @@ export default function NotaryRoom() {
       [participant.role]: participant
     }));
   }, []);
+
+  const handleRecordingStatusChange = useCallback((status: RecordingStatus | null) => {
+    console.log(`[NotaryRoom] Recording status change:`, status);
+    setRecordingStatus(status);
+  }, []);
+
+  const endCall = useCallback(async () => {
+    if (!recordingStatus?.roomSid) return;
+    
+    setIsEndingCall(true);
+    try {
+      // End the room to finalize the composition
+      const response = await fetch(`${getServerUrl()}/api/room/${recordingStatus.roomSid}/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.ok) {
+        console.log('Room ended successfully');
+        // Start polling for recording completion
+        setIsFinalizingRecording(true);
+        try {
+          const sid = recordingStatus.recordingSid;
+          const maxAttempts = 60; // ~3 minutes at 3s interval
+          const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+          for (let i = 0; i < maxAttempts; i++) {
+            const res = await fetch(`${getServerUrl()}/api/recording/${sid}`);
+            if (res.ok) {
+              const data = await res.json();
+              setRecordingStatus(data);
+              if (data.status === 'completed') {
+                break;
+              }
+            }
+            await delay(3000);
+          }
+        } finally {
+          setIsFinalizingRecording(false);
+        }
+      } else {
+        console.error('Failed to end room');
+      }
+    } catch (error) {
+      console.error('Error ending room:', error);
+    } finally {
+      setIsEndingCall(false);
+    }
+  }, [recordingStatus?.roomSid, navigate]);
 
   if (isLoading) {
     return (
@@ -130,6 +183,7 @@ export default function NotaryRoom() {
           onLocalDataTrack={handleLocalDataTrack}
           onRemoteData={handleRemoteData}
           onParticipantUpdate={handleParticipantUpdate}
+          onRecordingStatusChange={handleRecordingStatusChange}
         />
         
         <div className="mt-4 p-3 bg-white rounded-lg shadow">
@@ -145,6 +199,60 @@ export default function NotaryRoom() {
                 {participantInfo.client.isConnected ? "Connected" : "Waiting..."}
               </span>
             </div>
+            {recordingStatus && (
+              <div className="flex justify-between">
+                <span>Recording:</span>
+                <span className={`font-medium ${
+                  recordingStatus.status === 'in-progress' ? 'text-red-600' :
+                  recordingStatus.status === 'completed' ? 'text-green-600' :
+                  'text-gray-600'
+                }`}>
+                  {recordingStatus.status}
+                </span>
+              </div>
+            )}
+          </div>
+          
+          {/* Recording Status Info */}
+          {recordingStatus && (
+            <div className="mt-3 p-2 bg-gray-50 rounded text-xs text-gray-600">
+              {recordingStatus.status === 'enqueued' && (
+                <div>
+                  <p className="font-medium text-orange-600">Recording queued for processing</p>
+                  <p>End the call to finalize the recording and get download link.</p>
+                </div>
+              )}
+              {recordingStatus.status === 'completed' && (
+                <div>
+                  <p className="font-medium text-green-600">Recording ready!</p>
+                  <p>Click "Download Recording" to save the video file.</p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* End Call + Finalization */}
+          <div className="mt-3 space-y-2">
+            <button
+              onClick={endCall}
+              disabled={isEndingCall || isFinalizingRecording}
+              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium"
+            >
+              {isEndingCall ? 'Ending Call...' : 'End Call'}
+            </button>
+            {isFinalizingRecording && (
+              <div className="text-xs text-gray-600">Finalizing recording… waiting for Twilio to complete.</div>
+            )}
+            {recordingStatus?.status === 'completed' && (
+              <a
+                href={`${getServerUrl()}/api/recording/${recordingStatus.recordingSid}/media`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block w-full text-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium"
+              >
+                Download Recording
+              </a>
+            )}
           </div>
         </div>
       </div>

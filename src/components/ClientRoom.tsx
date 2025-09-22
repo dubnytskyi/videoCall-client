@@ -5,6 +5,7 @@ import PdfCollaborator from "./PdfCollaborator";
 import { fetchTwilioToken } from "../lib/twilioToken";
 import { CollabOp, Participant } from "../types/collab";
 import { LocalDataTrack } from "twilio-video";
+import { RecordingStatus } from "../lib/recordingService";
 
 export default function ClientRoom() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function ClientRoom() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [remoteData, setRemoteData] = useState<CollabOp | null>(null);
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
   
   // Stable identity that doesn't change on re-renders
   const identityRef = useRef<string | null>(null);
@@ -62,6 +64,11 @@ export default function ClientRoom() {
       ...prev,
       [participant.role]: participant
     }));
+  }, []);
+
+  const handleRecordingStatusChange = useCallback((status: RecordingStatus | null) => {
+    console.log(`[ClientRoom] Recording status change:`, status);
+    setRecordingStatus(status);
   }, []);
 
   if (isLoading) {
@@ -125,6 +132,7 @@ export default function ClientRoom() {
           onLocalDataTrack={handleLocalDataTrack}
           onRemoteData={handleRemoteData}
           onParticipantUpdate={handleParticipantUpdate}
+          onRecordingStatusChange={handleRecordingStatusChange}
         />
         
         <div className="mt-4 p-3 bg-white rounded-lg shadow">
@@ -140,6 +148,18 @@ export default function ClientRoom() {
               <span>Client:</span>
               <span className="text-green-600 font-medium">Connected</span>
             </div>
+            {recordingStatus && (
+              <div className="flex justify-between">
+                <span>Recording:</span>
+                <span className={`font-medium ${
+                  recordingStatus.status === 'in-progress' ? 'text-red-600' :
+                  recordingStatus.status === 'completed' ? 'text-green-600' :
+                  'text-gray-600'
+                }`}>
+                  {recordingStatus.status}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
