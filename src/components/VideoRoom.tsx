@@ -308,6 +308,19 @@ export default function VideoRoom({
         console.log(`[${identity}] Successfully connected to room`);
         console.log(`[${identity}] Local participant identity: ${roomInstance.localParticipant.identity}`);
 
+        // If notary joins, disconnect all other participants in the room via server
+        if (role === 'notary') {
+          try {
+            await fetch(`${getServerUrl()}/api/room/${roomInstance.sid}/kick-others`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ keepIdentity: roomInstance.localParticipant.identity })
+            });
+          } catch (e) {
+            console.warn('[VideoRoom] Failed to kick others:', e);
+          }
+        }
+
         // Ensure recording is disabled until user presses Start
         try {
           await setRecordingRules(roomInstance.sid, [{ type: 'exclude', all: true }]);
