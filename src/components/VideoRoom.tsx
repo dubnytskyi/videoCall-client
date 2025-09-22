@@ -268,6 +268,12 @@ export default function VideoRoom({
         // Connect to room with available tracks
         console.log(`[${identity}] Connecting with ${tracks.length} tracks:`, tracks.map(t => t.kind));
         console.log(`[${identity}] About to call connect() with local tracks...`);
+        // Choose codec per browser: Chrome → VP8 (simulcast on), Safari → H264
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        const preferredCodecs = isSafari
+          ? [{ codec: 'H264', simulcast: false }]
+          : [{ codec: 'VP8', simulcast: true }];
+
         const roomInstance: any = await connect(token, {
           name: "notary-room",
           tracks,
@@ -275,15 +281,15 @@ export default function VideoRoom({
           bandwidthProfile: {
             video: {
               mode: 'collaboration',
-              trackSwitchOffMode: 'detected',
+              trackSwitchOffMode: 'predicted',
               contentPreferencesMode: 'auto',
-              maxSubscriptionBitrate: 800000,
+              maxSubscriptionBitrate: 1200000,
             }
           } as any,
-          preferredVideoCodecs: [{ codec: 'H264', simulcast: false }] as any,
+          preferredVideoCodecs: preferredCodecs as any,
           maxAudioBitrate: 32000,
           dscpTagging: true,
-          networkQuality: { local: 2, remote: 2 },
+          networkQuality: { local: 3, remote: 3 },
           dominantSpeaker: true,
         });
 
