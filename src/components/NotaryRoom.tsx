@@ -291,24 +291,24 @@ export default function NotaryRoom() {
                     let stream: MediaStream | null = null;
                     
                     // Method 1: captureStream (preferred)
-                    if ((canvas as any).captureStream) {
-                      try {
-                        stream = (canvas as any).captureStream(15);
-                        console.log('[NotaryRoom] captureStream method succeeded');
-                      } catch (e) {
-                        console.warn('[NotaryRoom] captureStream failed:', e);
-                      }
+                  if ((canvas as any).captureStream) {
+                    try {
+                      stream = (canvas as any).captureStream(30);
+                      console.log('[NotaryRoom] captureStream method succeeded @30fps');
+                    } catch (e) {
+                      console.warn('[NotaryRoom] captureStream failed:', e);
                     }
+                  }
                     
                     // Method 2: captureStream with different frame rate
-                    if (!stream && (canvas as any).captureStream) {
-                      try {
-                        stream = (canvas as any).captureStream(30);
-                        console.log('[NotaryRoom] captureStream(30) method succeeded');
-                      } catch (e) {
-                        console.warn('[NotaryRoom] captureStream(30) failed:', e);
-                      }
+                  if (!stream && (canvas as any).captureStream) {
+                    try {
+                      stream = (canvas as any).captureStream(60);
+                      console.log('[NotaryRoom] captureStream(60) method succeeded');
+                    } catch (e) {
+                      console.warn('[NotaryRoom] captureStream(60) failed:', e);
                     }
+                  }
                     
                     // Method 3: Try without frame rate parameter
                     if (!stream && (canvas as any).captureStream) {
@@ -368,12 +368,9 @@ export default function NotaryRoom() {
                 // Also try after a delay in case canvas isn't ready yet
                 setTimeout(tryCaptureCanvas, 500);
               } else {
-                // Clean up when canvas is removed
+                // Do not immediately stop the track on transient nulls; keep it alive for a bit
                 if (canvasTrackRef.current) {
-                  console.log('[NotaryRoom] Stopping canvas track');
-                  canvasTrackRef.current.stop();
-                  canvasTrackRef.current = null;
-                  canvasStreamRef.current = null;
+                  console.log('[NotaryRoom] Canvas ref null temporarily, keeping track alive');
                 }
               }
             }}

@@ -309,6 +309,17 @@ export default function PdfCollaborator({
       
       if (base && overlay && base.width > 0 && base.height > 0) {
         console.log(`[PdfCollaborator] Starting composite with base canvas: ${base.width}x${base.height}`);
+        // Ensure composite canvas has correct size BEFORE exposing to parent
+        if (composite.width !== base.width || composite.height !== base.height) {
+          composite.width = base.width;
+          composite.height = base.height;
+        }
+        const cctx = composite.getContext('2d');
+        if (cctx) {
+          cctx.clearRect(0, 0, composite.width, composite.height);
+          cctx.drawImage(base, 0, 0);
+          cctx.drawImage(overlay, 0, 0);
+        }
         onCanvasRef(composite);
         compositeRafRef.current = requestAnimationFrame(step);
       } else {
