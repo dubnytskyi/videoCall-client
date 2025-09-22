@@ -181,7 +181,7 @@ export default function VideoRoom({
       console.log(`[${identity}] Stopping recording:`, recordingStatus.recordingSid);
       
       const status = await recordingService.stopRecording();
-      setRecordingStatus(status);
+      setRecordingStatus(status || null);
       setIsRecording(false);
       
       if (onRecordingStatusChange) {

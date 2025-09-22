@@ -45,7 +45,7 @@ export class RecordingService {
     }
   }
 
-  async stopRecording(): Promise<RecordingStatus> {
+  async stopRecording(): Promise<RecordingStatus | null> {
     if (!this.currentRecording) {
       throw new Error("No active recording to stop");
     }
