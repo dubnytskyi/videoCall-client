@@ -314,16 +314,16 @@ export default function VideoRoom({
           console.log(`[${identity}] Applied recording rules: exclude all`);
         } catch {}
 
-        // Display local video
+        // Display local video using Twilio attach API
         if (localVideoRef.current && videoTrack) {
           console.log(`[${identity}] Setting up local video display - videoTrack:`, videoTrack);
-          localVideoRef.current.srcObject = new MediaStream([videoTrack.mediaStreamTrack]);
-          localVideoRef.current.muted = true;
-          localVideoRef.current.play().then(() => {
-            console.log(`[${identity}] Local video playing successfully`);
-          }).catch((err) => {
-            console.error(`[${identity}] Failed to play local video:`, err);
-          });
+          try {
+            (videoTrack as any).attach(localVideoRef.current);
+            localVideoRef.current.muted = true;
+            localVideoRef.current.play().catch(() => {});
+          } catch (err) {
+            console.error(`[${identity}] Failed to attach local video:`, err);
+          }
         } else {
           console.warn(`[${identity}] No video track available for local display - localVideoRef:`, !!localVideoRef.current, 'videoTrack:', !!videoTrack);
         }
@@ -400,19 +400,16 @@ export default function VideoRoom({
             hasMediaStreamTrack: !!track.mediaStreamTrack
           });
 
-          if (track.kind === 'video' && remoteVideoRef.current && track.mediaStreamTrack) {
+          if (track.kind === 'video' && remoteVideoRef.current) {
             console.log(`[${identity}] Setting up remote video display - track:`, track);
             const attach = () => {
-              remoteVideoRef.current!.srcObject = new MediaStream([track.mediaStreamTrack]);
-              // Hint to browser for smoother playback on mobile
-              remoteVideoRef.current!.playsInline = true;
+              try {
+                (track as any).attach(remoteVideoRef.current!);
+                remoteVideoRef.current!.playsInline = true;
+              } catch {}
             };
             attach();
-            remoteVideoRef.current.play().then(() => {
-              console.log(`[${identity}] Remote video playing successfully`);
-            }).catch((err) => {
-              console.error(`[${identity}] Failed to play remote video:`, err);
-            });
+            remoteVideoRef.current.play().catch(() => {});
 
             // Prefer higher priority for the main remote video
             if (typeof track.setPriority === 'function') {
@@ -423,18 +420,23 @@ export default function VideoRoom({
               try { track.setContentPreferences({ renderDimensions: { width: 640, height: 360 }, frameRate: 24 }); } catch {}
             }
 
-            // Start freeze monitor - if frozen, reattach srcObject
+            // Start freeze monitor - if frozen, detach/reattach track
             const cleanupFreeze = startFreezeMonitor(remoteVideoRef.current, () => {
               if (!remoteVideoRef.current) return;
-              remoteVideoRef.current.pause();
-              remoteVideoRef.current.srcObject = null;
+              try { (track as any).detach(remoteVideoRef.current!); } catch {}
               attach();
               remoteVideoRef.current.play().catch(() => {});
             });
             // Clean up monitor when track unsubscribes
-            track.once && track.once('unsubscribed', () => cleanupFreeze());
+            track.once && track.once('unsubscribed', () => {
+              cleanupFreeze();
+              if (remoteVideoRef.current) {
+                try { (track as any).detach(remoteVideoRef.current); } catch {}
+                remoteVideoRef.current.srcObject = null;
+              }
+            });
           } else if (track.kind === 'video') {
-            console.warn(`[${identity}] Video track exists but no mediaStreamTrack or remoteVideoRef - track:`, track, 'remoteVideoRef:', !!remoteVideoRef.current, 'mediaStreamTrack:', !!track.mediaStreamTrack);
+            console.warn(`[${identity}] Video track exists but remoteVideoRef is missing - track:`, track, 'remoteVideoRef:', !!remoteVideoRef.current);
           }
 
           if (track.kind === 'audio' && remoteAudioRef.current && track.mediaStreamTrack) {
