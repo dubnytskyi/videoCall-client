@@ -273,6 +273,7 @@ export default function PdfCollaborator({
       if (composite.width !== base.width || composite.height !== base.height) {
         composite.width = base.width;
         composite.height = base.height;
+        console.log(`[PdfCollaborator] Composite canvas resized to: ${composite.width}x${composite.height}`);
       }
       const cctx = composite.getContext('2d');
       if (cctx) {
@@ -286,8 +287,19 @@ export default function PdfCollaborator({
     };
 
     // Start composite loop and provide composite canvas to parent
-    onCanvasRef(composite);
-    compositeRafRef.current = requestAnimationFrame(step);
+    // Wait a bit for canvas to be properly sized
+    const startComposite = () => {
+      if (base && overlay && base.width > 0 && base.height > 0) {
+        console.log(`[PdfCollaborator] Starting composite with base canvas: ${base.width}x${base.height}`);
+        onCanvasRef(composite);
+        compositeRafRef.current = requestAnimationFrame(step);
+      } else {
+        console.log(`[PdfCollaborator] Base canvas not ready yet, retrying...`);
+        setTimeout(startComposite, 100);
+      }
+    };
+    
+    startComposite();
 
     return () => {
       if (compositeRafRef.current) cancelAnimationFrame(compositeRafRef.current);

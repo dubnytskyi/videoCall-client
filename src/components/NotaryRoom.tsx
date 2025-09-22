@@ -272,27 +272,88 @@ export default function NotaryRoom() {
             isNotary={true}
             participantInfo={participantInfo}
             onCanvasRef={(canvas) => {
+              console.log('[NotaryRoom] Canvas ref changed:', !!canvas, canvas?.width, canvas?.height);
               compositeCanvasRef.current = canvas;
-              try {
-                if (canvas && !canvasTrackRef.current) {
-                  // Capture composite canvas at 15fps
-                  const stream: MediaStream = (canvas as any).captureStream(15);
-                  canvasStreamRef.current = stream;
-                  const tracks = stream.getVideoTracks();
-                  const track = tracks && tracks.length > 0 ? tracks[0] : undefined;
-                  if (track) {
-                    // Label helps debugging
-                    Object.defineProperty(track, 'kind', { value: 'video' });
-                    canvasTrackRef.current = track;
+              
+              const tryCaptureCanvas = () => {
+                try {
+                  if (canvas && !canvasTrackRef.current) {
+                    console.log('[NotaryRoom] Creating canvas stream from canvas:', canvas.width, 'x', canvas.height);
+                    
+                    // Check if canvas has valid dimensions
+                    if (canvas.width === 0 || canvas.height === 0) {
+                      console.warn('[NotaryRoom] Canvas has zero dimensions, waiting...');
+                      return;
+                    }
+                    
+                    // Try different approaches to capture canvas
+                    let stream: MediaStream | null = null;
+                    
+                    // Method 1: captureStream (preferred)
+                    if ((canvas as any).captureStream) {
+                      try {
+                        stream = (canvas as any).captureStream(15);
+                        console.log('[NotaryRoom] captureStream method succeeded');
+                      } catch (e) {
+                        console.warn('[NotaryRoom] captureStream failed:', e);
+                      }
+                    }
+                    
+                    // Method 2: captureStream with different frame rate
+                    if (!stream && (canvas as any).captureStream) {
+                      try {
+                        stream = (canvas as any).captureStream(30);
+                        console.log('[NotaryRoom] captureStream(30) method succeeded');
+                      } catch (e) {
+                        console.warn('[NotaryRoom] captureStream(30) failed:', e);
+                      }
+                    }
+                    
+                    // Method 3: Try without frame rate parameter
+                    if (!stream && (canvas as any).captureStream) {
+                      try {
+                        stream = (canvas as any).captureStream();
+                        console.log('[NotaryRoom] captureStream() method succeeded');
+                      } catch (e) {
+                        console.warn('[NotaryRoom] captureStream() failed:', e);
+                      }
+                    }
+                    
+                    if (stream) {
+                      canvasStreamRef.current = stream;
+                      const tracks = stream.getVideoTracks();
+                      const track = tracks && tracks.length > 0 ? tracks[0] : undefined;
+                      if (track) {
+                        console.log('[NotaryRoom] Canvas track created:', track.id, track.kind, track.label);
+                        // Label helps debugging
+                        Object.defineProperty(track, 'kind', { value: 'video' });
+                        canvasTrackRef.current = track;
+                      } else {
+                        console.warn('[NotaryRoom] No video tracks found in canvas stream');
+                      }
+                    } else {
+                      console.error('[NotaryRoom] All canvas capture methods failed');
+                    }
                   }
+                } catch (e) {
+                  console.warn('[NotaryRoom] Failed to capture canvas', e);
                 }
-                if (!canvas && canvasTrackRef.current) {
+              };
+              
+              if (canvas) {
+                // Try immediately
+                tryCaptureCanvas();
+                
+                // Also try after a delay in case canvas isn't ready yet
+                setTimeout(tryCaptureCanvas, 500);
+              } else {
+                // Clean up when canvas is removed
+                if (canvasTrackRef.current) {
+                  console.log('[NotaryRoom] Stopping canvas track');
                   canvasTrackRef.current.stop();
                   canvasTrackRef.current = null;
                   canvasStreamRef.current = null;
                 }
-              } catch (e) {
-                console.warn('[NotaryRoom] Failed to capture canvas', e);
               }
             }}
           />

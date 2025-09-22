@@ -564,7 +564,11 @@ export default function VideoRoom({
 
         // Publish canvas track if available
         if (canvasTrackRef.current) {
+          console.log(`[${identity}] Publishing canvas track:`, canvasTrackRef.current.id, canvasTrackRef.current.kind);
           await roomInstance.localParticipant.publishTrack(canvasTrackRef.current);
+          console.log(`[${identity}] Canvas track published successfully`);
+        } else {
+          console.log(`[${identity}] No canvas track to publish`);
         }
 
       } catch (error: any) {
