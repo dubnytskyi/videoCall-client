@@ -28,6 +28,8 @@ export default function PdfCollaborator({
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const compositeRef = useRef<HTMLCanvasElement | null>(null);
+  const compositeRafRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const cursorTimeoutRef = useRef<number | null>(null);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
@@ -255,9 +257,43 @@ export default function PdfCollaborator({
 
   // Pass canvas ref to parent for sharing
   useEffect(() => {
-    if (onCanvasRef) {
-      onCanvasRef(canvasRef.current);
+    if (!onCanvasRef) return;
+    const base = canvasRef.current;
+    const overlay = overlayRef.current;
+    if (!base || !overlay) return;
+
+    // Create or sync composite canvas
+    if (!compositeRef.current) {
+      compositeRef.current = document.createElement('canvas');
     }
+    const composite = compositeRef.current;
+
+    const step = () => {
+      if (!base || !overlay || !composite) return;
+      if (composite.width !== base.width || composite.height !== base.height) {
+        composite.width = base.width;
+        composite.height = base.height;
+      }
+      const cctx = composite.getContext('2d');
+      if (cctx) {
+        // Draw base PDF content
+        cctx.clearRect(0, 0, composite.width, composite.height);
+        cctx.drawImage(base, 0, 0);
+        // Draw overlay annotations
+        cctx.drawImage(overlay, 0, 0);
+      }
+      compositeRafRef.current = requestAnimationFrame(step);
+    };
+
+    // Start composite loop and provide composite canvas to parent
+    onCanvasRef(composite);
+    compositeRafRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (compositeRafRef.current) cancelAnimationFrame(compositeRafRef.current);
+      compositeRafRef.current = null;
+      onCanvasRef(null);
+    };
   }, [onCanvasRef]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {

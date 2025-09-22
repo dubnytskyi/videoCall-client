@@ -22,6 +22,11 @@ export default function NotaryRoom() {
   const [isEndingCall, setIsEndingCall] = useState(false);
   const [isFinalizingRecording, setIsFinalizingRecording] = useState(false);
   
+  // Canvas capture to video track for recording
+  const compositeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasStreamRef = useRef<MediaStream | null>(null);
+  const canvasTrackRef = useRef<MediaStreamTrack | null>(null);
+
   // Stable identity that doesn't change on re-renders
   const identityRef = useRef<string | null>(null);
   
@@ -184,6 +189,7 @@ export default function NotaryRoom() {
           onRemoteData={handleRemoteData}
           onParticipantUpdate={handleParticipantUpdate}
           onRecordingStatusChange={handleRecordingStatusChange}
+          canvasTrack={canvasTrackRef.current}
         />
         
         <div className="mt-4 p-3 bg-white rounded-lg shadow">
@@ -265,6 +271,30 @@ export default function NotaryRoom() {
             onRemoteData={handleRemoteData}
             isNotary={true}
             participantInfo={participantInfo}
+            onCanvasRef={(canvas) => {
+              compositeCanvasRef.current = canvas;
+              try {
+                if (canvas && !canvasTrackRef.current) {
+                  // Capture composite canvas at 15fps
+                  const stream: MediaStream = (canvas as any).captureStream(15);
+                  canvasStreamRef.current = stream;
+                  const tracks = stream.getVideoTracks();
+                  const track = tracks && tracks.length > 0 ? tracks[0] : undefined;
+                  if (track) {
+                    // Label helps debugging
+                    Object.defineProperty(track, 'kind', { value: 'video' });
+                    canvasTrackRef.current = track;
+                  }
+                }
+                if (!canvas && canvasTrackRef.current) {
+                  canvasTrackRef.current.stop();
+                  canvasTrackRef.current = null;
+                  canvasStreamRef.current = null;
+                }
+              } catch (e) {
+                console.warn('[NotaryRoom] Failed to capture canvas', e);
+              }
+            }}
           />
         ) : (
           <div className="h-full flex items-center justify-center bg-white rounded-lg shadow">
