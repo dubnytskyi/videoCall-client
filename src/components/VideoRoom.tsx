@@ -3,6 +3,7 @@ import {
   connect,
   createLocalAudioTrack,
   createLocalVideoTrack,
+  LocalVideoTrack,
   LocalDataTrack,
   RemoteParticipant,
 } from "twilio-video";
@@ -45,6 +46,7 @@ export default function VideoRoom({
   const [isConnecting, setIsConnecting] = useState(false);
   const isConnectingRef = useRef(false);
   const connectedOnceRef = useRef(false);
+  const publishedCanvasTrackSidRef = useRef<string | null>(null);
   
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -564,9 +566,15 @@ export default function VideoRoom({
 
         // Publish canvas track if available
         if (canvasTrackRef.current) {
-          console.log(`[${identity}] Publishing canvas track:`, canvasTrackRef.current.id, canvasTrackRef.current.kind);
-          await roomInstance.localParticipant.publishTrack(canvasTrackRef.current);
-          console.log(`[${identity}] Canvas track published successfully`);
+          try {
+            console.log(`[${identity}] Publishing canvas track (as LocalVideoTrack):`, canvasTrackRef.current.id, canvasTrackRef.current.kind);
+            const localCanvas = new LocalVideoTrack(canvasTrackRef.current, { name: 'pdf-canvas' } as any);
+            const pub: any = await roomInstance.localParticipant.publishTrack(localCanvas, { name: 'pdf-canvas' } as any);
+            publishedCanvasTrackSidRef.current = pub?.trackSid || null;
+            console.log(`[${identity}] Canvas track published successfully`, publishedCanvasTrackSidRef.current);
+          } catch (e) {
+            console.warn(`[${identity}] Failed to publish canvas track at connect`, e);
+          }
         } else {
           console.log(`[${identity}] No canvas track to publish`);
         }
@@ -630,6 +638,25 @@ export default function VideoRoom({
       }
     };
   }, [token]);
+
+  // If canvas track appears after connecting, publish it
+  useEffect(() => {
+    const publishIfNeeded = async () => {
+      if (!room || !isConnected) return;
+      if (!canvasTrackRef.current) return;
+      if (publishedCanvasTrackSidRef.current) return; // already published
+      try {
+        console.log(`[${identity}] Publishing canvas track post-connect (as LocalVideoTrack)`);
+        const localCanvas = new LocalVideoTrack(canvasTrackRef.current, { name: 'pdf-canvas' } as any);
+        const pub: any = await room.localParticipant.publishTrack(localCanvas, { name: 'pdf-canvas' } as any);
+        publishedCanvasTrackSidRef.current = pub?.trackSid || null;
+        console.log(`[${identity}] Canvas track published post-connect`, publishedCanvasTrackSidRef.current);
+      } catch (e) {
+        console.warn(`[${identity}] Failed to publish canvas track post-connect`, e);
+      }
+    };
+    publishIfNeeded();
+  }, [canvasTrack, room, isConnected, identity]);
 
   return (
     <div className="flex flex-col gap-4">
