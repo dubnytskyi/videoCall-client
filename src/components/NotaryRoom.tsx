@@ -21,7 +21,6 @@ export default function NotaryRoom() {
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
   const [isEndingCall, setIsEndingCall] = useState(false);
   const [isFinalizingRecording, setIsFinalizingRecording] = useState(false);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   
   // Canvas capture to video track for recording
   const compositeCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -86,7 +85,7 @@ export default function NotaryRoom() {
   }, []);
 
   const endCall = useCallback(async () => {
-    if (!recordingStatus?.roomSid || !recordingStatus?.recordingSid) return;
+    if (!recordingStatus?.roomSid) return;
     
     setIsEndingCall(true);
     try {
@@ -98,61 +97,24 @@ export default function NotaryRoom() {
       
       if (response.ok) {
         console.log('Room ended successfully');
-        
-        // Wait for recording completion using server-side polling
+        // Start polling for recording completion
         setIsFinalizingRecording(true);
         try {
-          const waitResponse = await fetch(`${getServerUrl()}/api/recording/${recordingStatus.recordingSid}/wait-completion`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ timeout: 60000 }) // 1 minute timeout
-          });
-          
-          if (waitResponse.ok) {
-            const data = await waitResponse.json();
-            console.log('Recording completed:', data);
-            setRecordingStatus({
-              recordingSid: recordingStatus.recordingSid,
-              status: data.status,
-              duration: data.duration,
-              size: data.size,
-              url: data.url,
-              roomSid: data.roomSid
-            });
-            setIsFinalizingRecording(false);
-          } else {
-            console.error('Failed to wait for recording completion');
-            // Fallback to manual polling: 30 minutes, every 30 seconds
-            const maxAttempts = 60; // 60 * 30s = 30 minutes
-            const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-            for (let i = 0; i < maxAttempts; i++) {
-              try {
-                const res = await fetch(`${getServerUrl()}/api/recording/${recordingStatus.recordingSid}`);
-                if (res.ok) {
-                  const data = await res.json();
-                  setRecordingStatus(data);
-                  if (data.status === 'completed') {
-                    setIsFinalizingRecording(false);
-                    break;
-                  }
-                }
-              } catch (e) {
-                // ignore transient errors and continue polling
+          const sid = recordingStatus.recordingSid;
+          const maxAttempts = 60; // ~3 minutes at 3s interval
+          const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+          for (let i = 0; i < maxAttempts; i++) {
+            const res = await fetch(`${getServerUrl()}/api/recording/${sid}`);
+            if (res.ok) {
+              const data = await res.json();
+              setRecordingStatus(data);
+              if (data.status === 'completed') {
+                break;
               }
-              await delay(30000); // 30 seconds
             }
-            
-            // If still not completed after fallback polling, keep finalizing state
-            // User will need to wait or refresh the page later
-            if (recordingStatus?.status !== 'completed') {
-              console.log('Recording still processing, keeping finalizing state');
-              // Keep isFinalizingRecording true so user knows to wait
-            } else {
-              setIsFinalizingRecording(false);
-            }
+            await delay(3000);
           }
-        } catch (error) {
-          console.error('Error waiting for recording completion:', error);
+        } finally {
           setIsFinalizingRecording(false);
         }
       } else {
@@ -163,27 +125,7 @@ export default function NotaryRoom() {
     } finally {
       setIsEndingCall(false);
     }
-  }, [recordingStatus?.roomSid, recordingStatus?.recordingSid, navigate]);
-
-  const checkRecordingStatus = useCallback(async () => {
-    if (!recordingStatus?.recordingSid) return;
-    
-    setIsCheckingStatus(true);
-    try {
-      const response = await fetch(`${getServerUrl()}/api/recording/${recordingStatus.recordingSid}`);
-      if (response.ok) {
-        const data = await response.json();
-        setRecordingStatus(data);
-        if (data.status === 'completed') {
-          setIsFinalizingRecording(false);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking recording status:', error);
-    } finally {
-      setIsCheckingStatus(false);
-    }
-  }, [recordingStatus?.recordingSid]);
+  }, [recordingStatus?.roomSid, navigate]);
 
   if (isLoading) {
     return (
@@ -305,20 +247,7 @@ export default function NotaryRoom() {
               {isEndingCall ? 'Ending Call...' : 'End Call'}
             </button>
             {isFinalizingRecording && (
-              <div className="text-xs text-gray-600">
-                <div className="font-medium text-orange-600 mb-1">Finalizing recording...</div>
-                <div>Waiting for Twilio to process the video. This may take a few minutes.</div>
-                <div className="mt-2 text-xs text-gray-500">
-                  You can refresh this page later to check if the recording is ready.
-                </div>
-                <button
-                  onClick={checkRecordingStatus}
-                  disabled={isCheckingStatus}
-                  className="mt-2 w-full px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs"
-                >
-                  {isCheckingStatus ? 'Checking...' : 'Check Status Now'}
-                </button>
-              </div>
+              <div className="text-xs text-gray-600">Finalizing recording… waiting for Twilio to complete.</div>
             )}
             {recordingStatus?.status === 'completed' && (
               <a
@@ -362,24 +291,24 @@ export default function NotaryRoom() {
                     let stream: MediaStream | null = null;
                     
                     // Method 1: captureStream (preferred)
-                  if ((canvas as any).captureStream) {
-                    try {
-                      stream = (canvas as any).captureStream(30);
-                      console.log('[NotaryRoom] captureStream method succeeded @30fps');
-                    } catch (e) {
-                      console.warn('[NotaryRoom] captureStream failed:', e);
+                    if ((canvas as any).captureStream) {
+                      try {
+                        stream = (canvas as any).captureStream(15);
+                        console.log('[NotaryRoom] captureStream method succeeded');
+                      } catch (e) {
+                        console.warn('[NotaryRoom] captureStream failed:', e);
+                      }
                     }
-                  }
                     
                     // Method 2: captureStream with different frame rate
-                  if (!stream && (canvas as any).captureStream) {
-                    try {
-                      stream = (canvas as any).captureStream(60);
-                      console.log('[NotaryRoom] captureStream(60) method succeeded');
-                    } catch (e) {
-                      console.warn('[NotaryRoom] captureStream(60) failed:', e);
+                    if (!stream && (canvas as any).captureStream) {
+                      try {
+                        stream = (canvas as any).captureStream(30);
+                        console.log('[NotaryRoom] captureStream(30) method succeeded');
+                      } catch (e) {
+                        console.warn('[NotaryRoom] captureStream(30) failed:', e);
+                      }
                     }
-                  }
                     
                     // Method 3: Try without frame rate parameter
                     if (!stream && (canvas as any).captureStream) {

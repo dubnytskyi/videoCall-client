@@ -163,8 +163,8 @@ export default function VideoRoom({
       // CRITICAL: Wait for canvas track to be available before starting recording
       if (!canvasTrackRef.current) {
         console.warn(`[${identity}] No canvas track available! Waiting for canvas...`);
-        // Wait up to 3 seconds for canvas to be available
-        for (let i = 0; i < 30; i++) {
+        // Wait up to 10 seconds for canvas to be available
+        for (let i = 0; i < 100; i++) {
           await new Promise(resolve => setTimeout(resolve, 100));
           if (canvasTrackRef.current) {
             console.log(`[${identity}] Canvas track became available after ${i * 100}ms`);
@@ -175,8 +175,8 @@ export default function VideoRoom({
       
       // If still no canvas track, wait a bit more
       if (!canvasTrackRef.current) {
-        console.warn(`[${identity}] Still no canvas track after initial wait. Waiting 1 more second...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.warn(`[${identity}] Still no canvas track after initial wait. Waiting 2 more seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
       // CRITICAL: Ensure canvas track is published BEFORE starting composition
@@ -196,7 +196,7 @@ export default function VideoRoom({
           console.log(`[${identity}] Canvas track published (pre-record):`, publishedCanvasTrackSidRef.current);
           
           // Wait a moment for the track to be fully registered
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           // Log all published tracks to verify canvas is included
           console.log(`[${identity}] All published tracks after canvas publish:`, Array.from(room.localParticipant.tracks.values()).map((t: any) => ({
@@ -289,8 +289,7 @@ export default function VideoRoom({
             width: 640,
             height: 360,
             frameRate: 24,
-            name: 'camera',
-          } as any);
+          });
           console.log(`[${identity}] Video track created successfully (640x360@24)`);
         } catch (videoError) {
           console.warn(`[${identity}] 640x360@24 failed, trying 320x240@15:`, videoError);
@@ -298,8 +297,7 @@ export default function VideoRoom({
             width: 320,
             height: 240,
             frameRate: 15,
-            name: 'camera',
-          } as any);
+          });
           console.log(`[${identity}] Video track created successfully (320x240@15)`);
         }
 
@@ -334,10 +332,7 @@ export default function VideoRoom({
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         const preferredCodecs = isSafari
           ? [{ codec: 'H264', simulcast: false }]
-          : [
-              { codec: 'VP8', simulcast: true },
-              { codec: 'H264', simulcast: false }
-            ];
+          : [{ codec: 'VP8', simulcast: true }];
 
         const roomInstance: any = await connect(token, {
           name: "notary-room",
@@ -477,13 +472,6 @@ export default function VideoRoom({
             isSubscribed: track.isSubscribed,
             hasMediaStreamTrack: !!track.mediaStreamTrack
           });
-
-          // Do not render the PDF canvas track in the main remote video element
-          const trackName = (track as any)?.name || (track as any)?.trackName;
-          if (track.kind === 'video' && (trackName === 'pdf-canvas')) {
-            console.log(`[${identity}] Skipping attach for pdf-canvas track in main remote video`);
-            return;
-          }
 
           if (track.kind === 'video' && remoteVideoRef.current) {
             console.log(`[${identity}] Setting up remote video display - track:`, track);
