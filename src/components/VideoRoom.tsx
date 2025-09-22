@@ -163,8 +163,8 @@ export default function VideoRoom({
       // CRITICAL: Wait for canvas track to be available before starting recording
       if (!canvasTrackRef.current) {
         console.warn(`[${identity}] No canvas track available! Waiting for canvas...`);
-        // Wait up to 10 seconds for canvas to be available
-        for (let i = 0; i < 100; i++) {
+        // Wait up to 3 seconds for canvas to be available
+        for (let i = 0; i < 30; i++) {
           await new Promise(resolve => setTimeout(resolve, 100));
           if (canvasTrackRef.current) {
             console.log(`[${identity}] Canvas track became available after ${i * 100}ms`);
@@ -175,8 +175,8 @@ export default function VideoRoom({
       
       // If still no canvas track, wait a bit more
       if (!canvasTrackRef.current) {
-        console.warn(`[${identity}] Still no canvas track after initial wait. Waiting 2 more seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.warn(`[${identity}] Still no canvas track after initial wait. Waiting 1 more second...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
       // CRITICAL: Ensure canvas track is published BEFORE starting composition
@@ -196,7 +196,7 @@ export default function VideoRoom({
           console.log(`[${identity}] Canvas track published (pre-record):`, publishedCanvasTrackSidRef.current);
           
           // Wait a moment for the track to be fully registered
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 500));
           
           // Log all published tracks to verify canvas is included
           console.log(`[${identity}] All published tracks after canvas publish:`, Array.from(room.localParticipant.tracks.values()).map((t: any) => ({
