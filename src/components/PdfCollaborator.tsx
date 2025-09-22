@@ -257,9 +257,11 @@ export default function PdfCollaborator({
 
   // Pass canvas ref to parent for sharing
   useEffect(() => {
+    console.log(`[PdfCollaborator] useEffect triggered, onCanvasRef:`, !!onCanvasRef);
     if (!onCanvasRef) return;
     const base = canvasRef.current;
     const overlay = overlayRef.current;
+    console.log(`[PdfCollaborator] Canvas refs:`, { base: !!base, overlay: !!overlay });
     if (!base || !overlay) return;
 
     // Create or sync composite canvas
@@ -282,6 +284,13 @@ export default function PdfCollaborator({
         cctx.drawImage(base, 0, 0);
         // Draw overlay annotations
         cctx.drawImage(overlay, 0, 0);
+        
+        // Add a visual indicator that this canvas is being captured
+        cctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+        cctx.fillRect(0, 0, composite.width, composite.height);
+        cctx.fillStyle = 'red';
+        cctx.font = '16px Arial';
+        cctx.fillText('RECORDING', 10, 30);
       }
       compositeRafRef.current = requestAnimationFrame(step);
     };
@@ -289,6 +298,15 @@ export default function PdfCollaborator({
     // Start composite loop and provide composite canvas to parent
     // Wait a bit for canvas to be properly sized
     const startComposite = () => {
+      console.log(`[PdfCollaborator] Checking canvas readiness:`, {
+        base: !!base,
+        overlay: !!overlay,
+        baseWidth: base?.width,
+        baseHeight: base?.height,
+        overlayWidth: overlay?.width,
+        overlayHeight: overlay?.height
+      });
+      
       if (base && overlay && base.width > 0 && base.height > 0) {
         console.log(`[PdfCollaborator] Starting composite with base canvas: ${base.width}x${base.height}`);
         onCanvasRef(composite);

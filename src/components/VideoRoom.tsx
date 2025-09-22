@@ -568,10 +568,22 @@ export default function VideoRoom({
         if (canvasTrackRef.current) {
           try {
             console.log(`[${identity}] Publishing canvas track (as LocalVideoTrack):`, canvasTrackRef.current.id, canvasTrackRef.current.kind);
+            console.log(`[${identity}] Canvas track details:`, {
+              enabled: canvasTrackRef.current.enabled,
+              readyState: canvasTrackRef.current.readyState,
+              settings: canvasTrackRef.current.getSettings()
+            });
             const localCanvas = new LocalVideoTrack(canvasTrackRef.current, { name: 'pdf-canvas' } as any);
-            const pub: any = await roomInstance.localParticipant.publishTrack(localCanvas, { name: 'pdf-canvas' } as any);
+            const pub: any = await roomInstance.localParticipant.publishTrack(localCanvas, { name: 'pdf-canvas', priority: 'high' } as any);
             publishedCanvasTrackSidRef.current = pub?.trackSid || null;
             console.log(`[${identity}] Canvas track published successfully`, publishedCanvasTrackSidRef.current);
+            
+            // Log all published tracks
+            console.log(`[${identity}] All published tracks:`, Array.from(roomInstance.localParticipant.tracks.values()).map((t: any) => ({
+              kind: t.kind,
+              name: t.trackName,
+              sid: t.trackSid
+            })));
           } catch (e) {
             console.warn(`[${identity}] Failed to publish canvas track at connect`, e);
           }
@@ -648,7 +660,7 @@ export default function VideoRoom({
       try {
         console.log(`[${identity}] Publishing canvas track post-connect (as LocalVideoTrack)`);
         const localCanvas = new LocalVideoTrack(canvasTrackRef.current, { name: 'pdf-canvas' } as any);
-        const pub: any = await room.localParticipant.publishTrack(localCanvas, { name: 'pdf-canvas' } as any);
+        const pub: any = await room.localParticipant.publishTrack(localCanvas, { name: 'pdf-canvas', priority: 'high' } as any);
         publishedCanvasTrackSidRef.current = pub?.trackSid || null;
         console.log(`[${identity}] Canvas track published post-connect`, publishedCanvasTrackSidRef.current);
       } catch (e) {

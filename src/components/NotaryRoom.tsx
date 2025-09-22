@@ -273,6 +273,7 @@ export default function NotaryRoom() {
             participantInfo={participantInfo}
             onCanvasRef={(canvas) => {
               console.log('[NotaryRoom] Canvas ref changed:', !!canvas, canvas?.width, canvas?.height);
+              console.log('[NotaryRoom] Canvas element:', canvas);
               compositeCanvasRef.current = canvas;
               
               const tryCaptureCanvas = () => {
@@ -319,21 +320,41 @@ export default function NotaryRoom() {
                       }
                     }
                     
-                    if (stream) {
-                      canvasStreamRef.current = stream;
-                      const tracks = stream.getVideoTracks();
-                      const track = tracks && tracks.length > 0 ? tracks[0] : undefined;
-                      if (track) {
-                        console.log('[NotaryRoom] Canvas track created:', track.id, track.kind, track.label);
-                        // Label helps debugging
-                        Object.defineProperty(track, 'kind', { value: 'video' });
-                        canvasTrackRef.current = track;
-                      } else {
-                        console.warn('[NotaryRoom] No video tracks found in canvas stream');
-                      }
+                  if (stream) {
+                    canvasStreamRef.current = stream;
+                    const tracks = stream.getVideoTracks();
+                    const track = tracks && tracks.length > 0 ? tracks[0] : undefined;
+                    if (track) {
+                      console.log('[NotaryRoom] Canvas track created:', track.id, track.kind, track.label);
+                      console.log('[NotaryRoom] Canvas track settings:', {
+                        width: track.getSettings().width,
+                        height: track.getSettings().height,
+                        frameRate: track.getSettings().frameRate,
+                        enabled: track.enabled,
+                        readyState: track.readyState
+                      });
+                      // Label helps debugging
+                      Object.defineProperty(track, 'kind', { value: 'video' });
+                      canvasTrackRef.current = track;
+                      
+                      // Test if track is actually producing frames
+                      const testVideo = document.createElement('video');
+                      testVideo.srcObject = stream;
+                      testVideo.play().then(() => {
+                        console.log('[NotaryRoom] Canvas stream test video started');
+                        setTimeout(() => {
+                          console.log('[NotaryRoom] Canvas stream test video dimensions:', testVideo.videoWidth, 'x', testVideo.videoHeight);
+                          testVideo.remove();
+                        }, 1000);
+                      }).catch(e => {
+                        console.warn('[NotaryRoom] Canvas stream test video failed:', e);
+                      });
                     } else {
-                      console.error('[NotaryRoom] All canvas capture methods failed');
+                      console.warn('[NotaryRoom] No video tracks found in canvas stream');
                     }
+                  } else {
+                    console.error('[NotaryRoom] All canvas capture methods failed');
+                  }
                   }
                 } catch (e) {
                   console.warn('[NotaryRoom] Failed to capture canvas', e);
