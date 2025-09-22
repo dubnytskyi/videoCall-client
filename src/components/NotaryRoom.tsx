@@ -290,27 +290,27 @@ export default function NotaryRoom() {
                     // Try different approaches to capture canvas
                     let stream: MediaStream | null = null;
                     
-                    // Method 1: captureStream (preferred)
+                    // Method 1: captureStream with high frame rate for smooth recording
                     if ((canvas as any).captureStream) {
                       try {
-                        stream = (canvas as any).captureStream(15);
-                        console.log('[NotaryRoom] captureStream method succeeded');
-                      } catch (e) {
-                        console.warn('[NotaryRoom] captureStream failed:', e);
-                      }
-                    }
-                    
-                    // Method 2: captureStream with different frame rate
-                    if (!stream && (canvas as any).captureStream) {
-                      try {
-                        stream = (canvas as any).captureStream(30);
+                        stream = (canvas as any).captureStream(30); // Higher frame rate for smoother recording
                         console.log('[NotaryRoom] captureStream(30) method succeeded');
                       } catch (e) {
                         console.warn('[NotaryRoom] captureStream(30) failed:', e);
                       }
                     }
                     
-                    // Method 3: Try without frame rate parameter
+                    // Method 2: captureStream with 60fps for maximum quality
+                    if (!stream && (canvas as any).captureStream) {
+                      try {
+                        stream = (canvas as any).captureStream(60);
+                        console.log('[NotaryRoom] captureStream(60) method succeeded');
+                      } catch (e) {
+                        console.warn('[NotaryRoom] captureStream(60) failed:', e);
+                      }
+                    }
+                    
+                    // Method 3: Try without frame rate parameter (browser default)
                     if (!stream && (canvas as any).captureStream) {
                       try {
                         stream = (canvas as any).captureStream();

@@ -97,24 +97,36 @@ export default function PdfCollaborator({
       if (pdfDoc && pdfDoc.numPages) {
         // Render actual PDF page
         const page = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale });
+        // Use higher scale for better quality in recordings
+        const recordingScale = Math.max(scale, 2.0); // Minimum 2x scale for recording quality
+        const viewport = page.getViewport({ scale: recordingScale });
+        
         if (canvas.width !== viewport.width || canvas.height !== viewport.height) {
           canvas.width = viewport.width;
           canvas.height = viewport.height;
         }
+
+        // Enable high-quality rendering
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
 
         await page.render({
           canvasContext: context,
           viewport: viewport,
         }).promise;
       } else {
-        // Render fallback document
-        const targetW = 612 * scale;
-        const targetH = 792 * scale;
+        // Render fallback document with higher quality
+        const recordingScale = Math.max(scale, 2.0); // Minimum 2x scale for recording quality
+        const targetW = 612 * recordingScale;
+        const targetH = 792 * recordingScale;
         if (canvas.width !== targetW || canvas.height !== targetH) {
           canvas.width = targetW;
           canvas.height = targetH;
         }
+        
+        // Enable high-quality rendering
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
         
         // Clear canvas
         context.fillStyle = "#ffffff";
@@ -182,6 +194,12 @@ export default function PdfCollaborator({
           overlay.height = canvas.height;
         }
         const octx = overlay.getContext('2d');
+        
+        // Enable high-quality rendering for overlay
+        if (octx) {
+          octx.imageSmoothingEnabled = true;
+          octx.imageSmoothingQuality = 'high';
+        }
         if (octx) {
           // Clear overlay
           octx.clearRect(0, 0, overlay.width, overlay.height);
@@ -264,30 +282,47 @@ export default function PdfCollaborator({
     console.log(`[PdfCollaborator] Canvas refs:`, { base: !!base, overlay: !!overlay });
     if (!base || !overlay) return;
 
-    // Create or sync composite canvas
+    // Create or sync composite canvas with high quality settings
     if (!compositeRef.current) {
       compositeRef.current = document.createElement('canvas');
     }
     const composite = compositeRef.current;
 
+    // Set high DPI for better quality
+    const devicePixelRatio = window.devicePixelRatio || 1;
+    const scaleFactor = Math.max(devicePixelRatio, 2); // Minimum 2x for recording quality
+
     const step = () => {
       if (!base || !overlay || !composite) return;
-      if (composite.width !== base.width || composite.height !== base.height) {
-        composite.width = base.width;
-        composite.height = base.height;
-        console.log(`[PdfCollaborator] Composite canvas resized to: ${composite.width}x${composite.height}`);
+      
+      // Calculate high-resolution dimensions
+      const targetWidth = base.width * scaleFactor;
+      const targetHeight = base.height * scaleFactor;
+      
+      if (composite.width !== targetWidth || composite.height !== targetHeight) {
+        composite.width = targetWidth;
+        composite.height = targetHeight;
+        console.log(`[PdfCollaborator] Composite canvas resized to: ${composite.width}x${composite.height} (${scaleFactor}x scale)`);
       }
+      
       const cctx = composite.getContext('2d');
       if (cctx) {
+        // Enable high-quality rendering
+        cctx.imageSmoothingEnabled = true;
+        cctx.imageSmoothingQuality = 'high';
+        
+        // Scale context for high DPI
+        cctx.scale(scaleFactor, scaleFactor);
+        
         // Draw base PDF content
-        cctx.clearRect(0, 0, composite.width, composite.height);
+        cctx.clearRect(0, 0, base.width, base.height);
         cctx.drawImage(base, 0, 0);
         // Draw overlay annotations
         cctx.drawImage(overlay, 0, 0);
         
         // Add a visual indicator that this canvas is being captured
         cctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
-        cctx.fillRect(0, 0, composite.width, composite.height);
+        cctx.fillRect(0, 0, base.width, base.height);
         cctx.fillStyle = 'red';
         cctx.font = '16px Arial';
         cctx.fillText('RECORDING', 10, 30);
