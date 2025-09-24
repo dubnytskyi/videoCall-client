@@ -292,12 +292,16 @@ export default function PdfCollaborator({
     const devicePixelRatio = window.devicePixelRatio || 1;
     const scaleFactor = Math.max(devicePixelRatio, 2); // Minimum 2x for recording quality
 
+    // Target logical size to match Twilio composition right region (640x720)
+    const targetLogicalWidth = 640;
+    const targetLogicalHeight = 720;
+
     const step = () => {
       if (!base || !overlay || !composite) return;
       
-      // Calculate high-resolution dimensions
-      const targetWidth = base.width * scaleFactor;
-      const targetHeight = base.height * scaleFactor;
+      // Calculate high-resolution backing dimensions for fixed 640x720 logical canvas
+      const targetWidth = targetLogicalWidth * scaleFactor;
+      const targetHeight = targetLogicalHeight * scaleFactor;
       
       if (composite.width !== targetWidth || composite.height !== targetHeight) {
         composite.width = targetWidth;
@@ -308,24 +312,30 @@ export default function PdfCollaborator({
       const cctx = composite.getContext('2d');
       if (cctx) {
         // Enable high-quality rendering
+        cctx.setTransform(1, 0, 0, 1, 0, 0);
         cctx.imageSmoothingEnabled = true;
         cctx.imageSmoothingQuality = 'high';
-        
-        // Scale context for high DPI
+
+        // Work in logical pixels, scaled by scaleFactor
         cctx.scale(scaleFactor, scaleFactor);
-        
-        // Draw base PDF content
-        cctx.clearRect(0, 0, base.width, base.height);
-        cctx.drawImage(base, 0, 0);
-        // Draw overlay annotations
-        cctx.drawImage(overlay, 0, 0);
-        
-        // Add a visual indicator that this canvas is being captured
-        cctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
-        cctx.fillRect(0, 0, base.width, base.height);
-        cctx.fillStyle = 'red';
-        cctx.font = '16px Arial';
-        cctx.fillText('RECORDING', 10, 30);
+
+        // Clear entire logical area
+        cctx.clearRect(0, 0, targetLogicalWidth, targetLogicalHeight);
+
+        // Compute cover scaling to fill 640x720 preserving aspect ratio
+        const coverScale = Math.max(
+          targetLogicalWidth / base.width,
+          targetLogicalHeight / base.height
+        );
+        const drawW = base.width * coverScale;
+        const drawH = base.height * coverScale;
+        const offsetX = (targetLogicalWidth - drawW) / 2;
+        const offsetY = (targetLogicalHeight - drawH) / 2;
+
+        // Draw base PDF content scaled to cover
+        cctx.drawImage(base, offsetX, offsetY, drawW, drawH);
+        // Draw overlay annotations scaled to the same cover
+        cctx.drawImage(overlay, offsetX, offsetY, drawW, drawH);
       }
       compositeRafRef.current = requestAnimationFrame(step);
     };
@@ -344,16 +354,29 @@ export default function PdfCollaborator({
       
       if (base && overlay && base.width > 0 && base.height > 0) {
         console.log(`[PdfCollaborator] Starting composite with base canvas: ${base.width}x${base.height}`);
-        // Ensure composite canvas has correct size BEFORE exposing to parent
-        if (composite.width !== base.width || composite.height !== base.height) {
-          composite.width = base.width;
-          composite.height = base.height;
+        // Ensure composite canvas has fixed logical size (640x720) BEFORE exposing to parent
+        if (
+          composite.width !== targetLogicalWidth ||
+          composite.height !== targetLogicalHeight
+        ) {
+          composite.width = targetLogicalWidth;
+          composite.height = targetLogicalHeight;
         }
         const cctx = composite.getContext('2d');
         if (cctx) {
+          cctx.setTransform(1, 0, 0, 1, 0, 0);
           cctx.clearRect(0, 0, composite.width, composite.height);
-          cctx.drawImage(base, 0, 0);
-          cctx.drawImage(overlay, 0, 0);
+          // Initial draw with cover scaling
+          const coverScale = Math.max(
+            targetLogicalWidth / base.width,
+            targetLogicalHeight / base.height
+          );
+          const drawW = base.width * coverScale;
+          const drawH = base.height * coverScale;
+          const offsetX = (targetLogicalWidth - drawW) / 2;
+          const offsetY = (targetLogicalHeight - drawH) / 2;
+          cctx.drawImage(base, offsetX, offsetY, drawW, drawH);
+          cctx.drawImage(overlay, offsetX, offsetY, drawW, drawH);
         }
         onCanvasRef(composite);
         compositeRafRef.current = requestAnimationFrame(step);

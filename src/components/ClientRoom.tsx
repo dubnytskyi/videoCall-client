@@ -19,6 +19,8 @@ export default function ClientRoom() {
   const [error, setError] = useState<string | null>(null);
   const [remoteData, setRemoteData] = useState<CollabOp | null>(null);
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
+  // Dedicated video element for pdf-canvas
+  const pdfVideoRef = useRef<HTMLVideoElement | null>(null);
   
   // Stable identity that doesn't change on re-renders
   const identityRef = useRef<string | null>(null);
@@ -133,6 +135,7 @@ export default function ClientRoom() {
           onRemoteData={handleRemoteData}
           onParticipantUpdate={handleParticipantUpdate}
           onRecordingStatusChange={handleRecordingStatusChange}
+          pdfVideoElRef={pdfVideoRef}
         />
         
         <div className="mt-4 p-3 bg-white rounded-lg shadow">
@@ -164,8 +167,22 @@ export default function ClientRoom() {
         </div>
       </div>
 
-      {/* Right Panel - Document View */}
+      {/* Right Panel - Document View (live pdf-canvas video) */}
       <div className="flex-1 p-4">
+        <div className="relative h-full bg-white rounded-lg shadow flex items-center justify-center">
+          <video
+            ref={pdfVideoRef}
+            className="w-full h-full object-contain rounded-lg bg-black"
+            playsInline
+            autoPlay
+            muted
+          />
+          <div className="absolute top-2 left-2 bg-purple-600 bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+            PDF Document (live)
+          </div>
+        </div>
+        
+        {/* Keep PdfCollaborator for data exchange only if needed; hide its canvas UI for client */}
         {localDataTrack ? (
           <PdfCollaborator
             localDataTrack={localDataTrack}

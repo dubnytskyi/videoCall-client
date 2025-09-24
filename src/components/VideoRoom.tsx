@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, RefObject } from "react";
 import {
   connect,
   createLocalAudioTrack,
@@ -20,6 +20,8 @@ type Props = {
   onParticipantUpdate: (participant: Participant) => void;
   canvasTrack?: any;
   onRecordingStatusChange?: (status: RecordingStatus | null) => void;
+  // Optional ref to an external <video> element for rendering the pdf-canvas track (client side)
+  pdfVideoElRef?: RefObject<HTMLVideoElement>;
 };
 
 export default function VideoRoom({ 
@@ -30,10 +32,12 @@ export default function VideoRoom({
   onRemoteData, 
   onParticipantUpdate,
   canvasTrack,
-  onRecordingStatusChange
+  onRecordingStatusChange,
+  pdfVideoElRef
 }: Props) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const internalPdfVideoRef = useRef<HTMLVideoElement>(null);
   const localAudioRef = useRef<HTMLAudioElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   
@@ -180,6 +184,7 @@ export default function VideoRoom({
       }
       
       // CRITICAL: Ensure canvas track is published BEFORE starting composition
+      // Only publish canvas track if we have one and it's not already published
       if (canvasTrackRef.current && !publishedCanvasTrackSidRef.current) {
         try {
           console.log(`[${identity}] Publishing canvas track before startRecording...`);
@@ -473,6 +478,33 @@ export default function VideoRoom({
             hasMediaStreamTrack: !!track.mediaStreamTrack
           });
 
+          // Route pdf-canvas to a dedicated element (external ref preferred, fallback to internal)
+          const trackName = (track as any)?.name || (track as any)?.trackName;
+          if (track.kind === 'video' && trackName === 'pdf-canvas') {
+            const targetPdfEl = pdfVideoElRef?.current || internalPdfVideoRef.current;
+            if (targetPdfEl) {
+              console.log(`[${identity}] Attaching pdf-canvas to dedicated PDF video element`);
+              try {
+                (track as any).attach(targetPdfEl);
+                targetPdfEl.playsInline = true;
+                targetPdfEl.autoplay = true;
+                targetPdfEl.muted = true; // pdf feed has no audio; mute just in case
+                targetPdfEl.play().catch(() => {});
+              } catch {}
+              // Prefer lower priority for pdf to keep camera smooth
+              if (typeof track.setPriority === 'function') {
+                try { track.setPriority('low'); } catch {}
+              }
+              if (typeof track.setContentPreferences === 'function') {
+                try { track.setContentPreferences({ renderDimensions: { width: 640, height: 720 }, frameRate: 24 }); } catch {}
+              }
+            } else {
+              console.warn(`[${identity}] No PDF video element available to attach pdf-canvas`);
+            }
+            return; // Do not fall through to main remote video
+          }
+
+          // Attach regular remote camera video to the main remote element
           if (track.kind === 'video' && remoteVideoRef.current) {
             console.log(`[${identity}] Setting up remote video display - track:`, track);
             const attach = () => {
@@ -828,7 +860,7 @@ export default function VideoRoom({
         </div>
       </div>
 
-      {/* Remote Video */}
+      {/* Remote Video (main camera) */}
       <div className="relative">
         <video 
           ref={remoteVideoRef} 
@@ -846,6 +878,22 @@ export default function VideoRoom({
           Remote Video
         </div>
       </div>
+
+      {/* PDF Video (only rendered internally when no external ref is provided and role is client) */}
+      {role === 'client' && !pdfVideoElRef && (
+        <div className="relative">
+          <video
+            ref={internalPdfVideoRef}
+            className="w-full h-96 rounded-lg shadow-lg bg-black object-contain"
+            playsInline
+            autoPlay
+            muted
+          />
+          <div className="absolute top-2 left-2 bg-purple-600 bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+            PDF Document (live)
+          </div>
+        </div>
+      )}
 
       {/* Volume Control */}
       {isVolumeControlVisible && (
