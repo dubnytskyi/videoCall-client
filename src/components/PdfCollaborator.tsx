@@ -288,27 +288,20 @@ export default function PdfCollaborator({
     }
     const composite = compositeRef.current;
 
-    // Set high DPI for better quality
+    // Set high DPI for better quality (fixed for session to avoid flicker)
     const devicePixelRatio = window.devicePixelRatio || 1;
     const scaleFactor = Math.max(devicePixelRatio, 2); // Minimum 2x for recording quality
 
     // Target logical size to match Twilio composition right region (640x720)
     const targetLogicalWidth = 640;
     const targetLogicalHeight = 720;
+    const targetWidth = targetLogicalWidth * scaleFactor;
+    const targetHeight = targetLogicalHeight * scaleFactor;
 
     const step = () => {
       if (!base || !overlay || !composite) return;
       
-      // Calculate high-resolution backing dimensions for fixed 640x720 logical canvas
-      const targetWidth = targetLogicalWidth * scaleFactor;
-      const targetHeight = targetLogicalHeight * scaleFactor;
-      
-      if (composite.width !== targetWidth || composite.height !== targetHeight) {
-        composite.width = targetWidth;
-        composite.height = targetHeight;
-        console.log(`[PdfCollaborator] Composite canvas resized to: ${composite.width}x${composite.height} (${scaleFactor}x scale)`);
-      }
-      
+      // Fixed high-resolution backing dimensions (avoid resizing during capture to prevent flicker)
       const cctx = composite.getContext('2d');
       if (cctx) {
         // Enable high-quality rendering
@@ -319,8 +312,9 @@ export default function PdfCollaborator({
         // Work in logical pixels, scaled by scaleFactor
         cctx.scale(scaleFactor, scaleFactor);
 
-        // Clear entire logical area
-        cctx.clearRect(0, 0, targetLogicalWidth, targetLogicalHeight);
+        // Clear entire logical area with opaque background to avoid alpha flicker
+        cctx.fillStyle = '#ffffff';
+        cctx.fillRect(0, 0, targetLogicalWidth, targetLogicalHeight);
 
         // Compute cover scaling to fill 640x720 preserving aspect ratio
         const coverScale = Math.max(
@@ -355,17 +349,17 @@ export default function PdfCollaborator({
       if (base && overlay && base.width > 0 && base.height > 0) {
         console.log(`[PdfCollaborator] Starting composite with base canvas: ${base.width}x${base.height}`);
         // Ensure composite canvas has fixed logical size (640x720) BEFORE exposing to parent
-        if (
-          composite.width !== targetLogicalWidth ||
-          composite.height !== targetLogicalHeight
-        ) {
-          composite.width = targetLogicalWidth;
-          composite.height = targetLogicalHeight;
+        // Set backing store once before capture to stable high-resolution size
+        if (composite.width !== targetWidth || composite.height !== targetHeight) {
+          composite.width = targetWidth;
+          composite.height = targetHeight;
         }
         const cctx = composite.getContext('2d');
         if (cctx) {
           cctx.setTransform(1, 0, 0, 1, 0, 0);
-          cctx.clearRect(0, 0, composite.width, composite.height);
+          // Draw opaque background first
+          cctx.fillStyle = '#ffffff';
+          cctx.fillRect(0, 0, composite.width, composite.height);
           // Initial draw with cover scaling
           const coverScale = Math.max(
             targetLogicalWidth / base.width,
