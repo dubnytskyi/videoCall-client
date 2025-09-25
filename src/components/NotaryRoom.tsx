@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import VideoRoom from "./VideoRoom";
 import PdfCollaborator from "./PdfCollaborator";
+import ScreenRecorder from "./ScreenRecorder";
 import { fetchTwilioToken } from "../lib/twilioToken";
 import { CollabOp, Participant } from "../types/collab";
 import { LocalDataTrack } from "twilio-video";
@@ -26,6 +27,11 @@ export default function NotaryRoom() {
   const compositeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStreamRef = useRef<MediaStream | null>(null);
   const canvasTrackRef = useRef<MediaStreamTrack | null>(null);
+  
+  // Refs for screen recording
+  const leftVideoRef = useRef<HTMLVideoElement | null>(null);
+  const rightVideoRef = useRef<HTMLVideoElement | null>(null);
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
 
   // Stable identity that doesn't change on re-renders
   const identityRef = useRef<string | null>(null);
@@ -82,6 +88,11 @@ export default function NotaryRoom() {
   const handleRecordingStatusChange = useCallback((status: RecordingStatus | null) => {
     console.log(`[NotaryRoom] Recording status change:`, status);
     setRecordingStatus(status);
+  }, []);
+
+  const handleScreenTrack = useCallback((track: MediaStreamTrack | null) => {
+    console.log(`[NotaryRoom] Screen track change:`, !!track);
+    screenTrackRef.current = track;
   }, []);
 
   const endCall = useCallback(async () => {
@@ -189,7 +200,9 @@ export default function NotaryRoom() {
           onRemoteData={handleRemoteData}
           onParticipantUpdate={handleParticipantUpdate}
           onRecordingStatusChange={handleRecordingStatusChange}
-          canvasTrack={canvasTrackRef.current}
+          canvasTrack={screenTrackRef.current}
+          leftVideoRef={leftVideoRef}
+          rightVideoRef={rightVideoRef}
         />
         
         <div className="mt-4 p-3 bg-white rounded-lg shadow">
@@ -384,6 +397,15 @@ export default function NotaryRoom() {
           </div>
         )}
       </div>
+
+      {/* Screen Recorder - captures everything for recording */}
+      <ScreenRecorder
+        leftVideoRef={leftVideoRef}
+        rightVideoRef={rightVideoRef}
+        pdfCanvasRef={compositeCanvasRef}
+        onScreenTrack={handleScreenTrack}
+        isRecording={recordingStatus?.status === 'in-progress'}
+      />
     </div>
   );
 }
