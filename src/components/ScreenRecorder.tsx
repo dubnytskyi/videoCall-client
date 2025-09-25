@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import html2canvas from "html2canvas";
-import { LocalVideoTrack } from "twilio-video";
 
 type Props = {
   // Refs to elements we want to capture
