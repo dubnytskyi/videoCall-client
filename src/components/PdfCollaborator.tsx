@@ -94,6 +94,7 @@ export default function PdfCollaborator({
     }
 
     try {
+      // ALWAYS render the base PDF/document first - this ensures it never disappears
       if (pdfDoc && pdfDoc.numPages) {
         // Render actual PDF page
         const page = await pdfDoc.getPage(pageNum);
@@ -110,6 +111,7 @@ export default function PdfCollaborator({
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = 'high';
 
+        // CRITICAL: Always render the PDF page first
         await page.render({
           canvasContext: context,
           viewport: viewport,
@@ -128,7 +130,7 @@ export default function PdfCollaborator({
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = 'high';
         
-        // Clear canvas
+        // CRITICAL: Always render the base document first
         context.fillStyle = "#ffffff";
         context.fillRect(0, 0, canvas.width, canvas.height);
         
@@ -254,7 +256,7 @@ export default function PdfCollaborator({
         }
       }
 
-      // Draw existing texts for this page
+      // Draw existing texts for this page ON TOP of PDF
       const pageTexts = texts.get(pageNum) || [];
       pageTexts.forEach(text => {
         if (text.type === "text") {
@@ -508,7 +510,16 @@ export default function PdfCollaborator({
   const handleRemoteData = (data: CollabOp) => {
     if (data.type === "draw") {
       console.log(`[PdfCollaborator] Received remote draw operation:`, data);
-      // For incremental segments (2 points), draw directly on canvas to avoid full re-render
+      
+      // Always update drawings state to maintain consistency
+      setDrawings(prev => {
+        const newDrawings = new Map(prev);
+        const pageDrawings = newDrawings.get(data.page) || [];
+        newDrawings.set(data.page, [...pageDrawings, data]);
+        return newDrawings;
+      });
+      
+      // For incremental segments (2 points), also draw directly on overlay for immediate feedback
       if (data.path.length === 2) {
         const overlay = overlayRef.current;
         const ctx = overlay ? overlay.getContext("2d") : null;
@@ -529,18 +540,8 @@ export default function PdfCollaborator({
           ctx.lineTo(x1, y1);
           ctx.stroke();
           ctx.restore();
-          // Do not update drawings to avoid triggering renderPage; keep it lightweight
-          return;
         }
       }
-
-      // For completed strokes (path > 2) or non-incremental, update drawings and let effect re-render
-      setDrawings(prev => {
-        const newDrawings = new Map(prev);
-        const pageDrawings = newDrawings.get(data.page) || [];
-        newDrawings.set(data.page, [...pageDrawings, data]);
-        return newDrawings;
-      });
     } else if (data.type === "text") {
       setTexts(prev => {
         const newTexts = new Map(prev);
@@ -583,8 +584,6 @@ export default function PdfCollaborator({
       // Cursor updates don't need page re-render
       return;
     }
-
-    // Don't re-render immediately - let useEffect handle it
   };
 
   // Handle remote data when it changes
@@ -595,11 +594,18 @@ export default function PdfCollaborator({
   }, [remoteData]);
 
   // Re-render page when drawings or texts change for current page
+  // Use a more controlled approach to avoid excessive re-renders
   useEffect(() => {
     if (pdfDoc && canvasRef.current) {
-      renderPage(currentPage);
+      // Only re-render if we have actual changes for the current page
+      const currentPageDrawings = drawings.get(currentPage) || [];
+      const currentPageTexts = texts.get(currentPage) || [];
+      
+      if (currentPageDrawings.length > 0 || currentPageTexts.length > 0 || isDrawing) {
+        renderPage(currentPage);
+      }
     }
-  }, [drawings, texts, currentPage, pdfDoc]);
+  }, [drawings, texts, currentPage, pdfDoc, isDrawing, renderPage]);
 
   // Update cursor position without re-rendering the page
   useEffect(() => {
