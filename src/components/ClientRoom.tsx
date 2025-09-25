@@ -167,33 +167,22 @@ export default function ClientRoom() {
         </div>
       </div>
 
-      {/* Right Panel - Document View (live pdf-canvas video) */}
+      {/* Right Panel - Document View */}
       <div className="flex-1 p-4">
-        <div className="relative h-full bg-white rounded-lg shadow">
-          <video
-            ref={pdfVideoRef}
-            className="w-full h-full object-cover rounded-lg bg-white"
-            playsInline
-            autoPlay
-            muted
+        {localDataTrack ? (
+          <PdfCollaborator
+            localDataTrack={localDataTrack}
+            onRemoteData={handleRemoteData}
+            isNotary={false}
+            participantInfo={participantInfo}
+            remoteData={remoteData}
           />
-          <div className="absolute top-2 left-2 bg-purple-600 bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-            PDF Document (live)
-          </div>
-          {/* White background when no video is playing */}
-          <div className="absolute inset-0 bg-white rounded-lg pointer-events-none" />
-        </div>
-        
-        {/* Hidden PdfCollaborator for data exchange only - client sees live video stream */}
-        {localDataTrack && (
-          <div style={{ display: 'none' }}>
-            <PdfCollaborator
-              localDataTrack={localDataTrack}
-              onRemoteData={handleRemoteData}
-              isNotary={false}
-              participantInfo={participantInfo}
-              remoteData={remoteData}
-            />
+        ) : (
+          <div className="h-full flex items-center justify-center bg-white rounded-lg shadow">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Initializing document viewer...</p>
+            </div>
           </div>
         )}
       </div>

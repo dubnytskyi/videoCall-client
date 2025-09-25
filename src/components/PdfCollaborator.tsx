@@ -98,9 +98,20 @@ export default function PdfCollaborator({
       if (pdfDoc && pdfDoc.numPages) {
         // Render actual PDF page
         const page = await pdfDoc.getPage(pageNum);
-        // Use higher scale for better quality in recordings
-        const recordingScale = Math.max(scale, 2.0); // Minimum 2x scale for recording quality
-        const viewport = page.getViewport({ scale: recordingScale });
+        
+        // Different scaling for notary vs client
+        let targetScale;
+        if (isNotary) {
+          // Notary: use higher scale for better quality in recordings
+          targetScale = Math.max(scale, 2.0);
+        } else {
+          // Client: scale to fit container width
+          const containerWidth = canvas.parentElement?.clientWidth || 800;
+          const viewport = page.getViewport({ scale: 1.0 });
+          targetScale = Math.min(containerWidth / viewport.width, 3.0); // Max 3x scale
+        }
+        
+        const viewport = page.getViewport({ scale: targetScale });
         
         if (canvas.width !== viewport.width || canvas.height !== viewport.height) {
           canvas.width = viewport.width;
@@ -117,10 +128,18 @@ export default function PdfCollaborator({
           viewport: viewport,
         }).promise;
       } else {
-        // Render fallback document with higher quality
-        const recordingScale = Math.max(scale, 2.0); // Minimum 2x scale for recording quality
-        const targetW = 612 * recordingScale;
-        const targetH = 792 * recordingScale;
+        // Render fallback document with appropriate scaling
+        let fallbackScale;
+        if (isNotary) {
+          fallbackScale = Math.max(scale, 2.0); // Minimum 2x scale for recording quality
+        } else {
+          // Client: scale to fit container width
+          const containerWidth = canvas.parentElement?.clientWidth || 800;
+          fallbackScale = Math.min(containerWidth / 612, 3.0); // Max 3x scale
+        }
+        
+        const targetW = 612 * fallbackScale;
+        const targetH = 792 * fallbackScale;
         if (canvas.width !== targetW || canvas.height !== targetH) {
           canvas.width = targetW;
           canvas.height = targetH;
@@ -703,11 +722,11 @@ export default function PdfCollaborator({
 
       {/* PDF Viewer */}
       <div className="flex-1 overflow-auto p-4">
-        <div ref={containerRef} className="flex justify-center">
-          <div className="relative">
+        <div ref={containerRef} className={`${isNotary ? 'flex justify-center' : 'w-full'}`}>
+          <div className={`relative ${isNotary ? '' : 'w-full'}`}>
             <canvas
               ref={canvasRef}
-              className="border border-gray-300 shadow-lg"
+              className={`border border-gray-300 shadow-lg ${isNotary ? '' : 'w-full h-auto'}`}
             />
             <canvas
               ref={overlayRef}
