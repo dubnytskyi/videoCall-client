@@ -67,9 +67,12 @@ export default function ScreenCapture({
 
   // Start/stop based on recording state
   useEffect(() => {
+    console.log('[ScreenCapture] Recording state changed:', { isRecording, isCapturing });
     if (isRecording && !isCapturing) {
+      console.log('[ScreenCapture] Auto-starting screen capture due to recording');
       startScreenCapture();
     } else if (!isRecording && isCapturing) {
+      console.log('[ScreenCapture] Auto-stopping screen capture due to recording end');
       stopScreenCapture();
     }
   }, [isRecording, isCapturing, startScreenCapture, stopScreenCapture]);
@@ -84,7 +87,7 @@ export default function ScreenCapture({
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4">
+    <div className="fixed top-4 right-4 bg-white rounded-lg shadow-lg p-4 z-50 max-w-sm">
       <h3 className="text-lg font-semibold text-gray-800 mb-2">Screen Capture</h3>
       
       {error && (
