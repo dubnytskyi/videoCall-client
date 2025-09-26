@@ -22,9 +22,6 @@ type Props = {
   onRecordingStatusChange?: (status: RecordingStatus | null) => void;
   // Optional ref to an external <video> element for rendering the pdf-canvas track (client side)
   pdfVideoElRef?: RefObject<HTMLVideoElement>;
-  // Refs for screen recording (notary side)
-  leftVideoRef?: RefObject<HTMLVideoElement>;
-  rightVideoRef?: RefObject<HTMLVideoElement>;
 };
 
 export default function VideoRoom({ 
@@ -36,9 +33,7 @@ export default function VideoRoom({
   onParticipantUpdate,
   canvasTrack,
   onRecordingStatusChange,
-  pdfVideoElRef,
-  leftVideoRef,
-  rightVideoRef
+  pdfVideoElRef
 }: Props) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -405,12 +400,6 @@ export default function VideoRoom({
             localVideoRef.current.muted = true;
             localVideoRef.current.play().catch(() => {});
             
-            // Also attach to screen recording refs if provided
-            if (leftVideoRef?.current && role === 'notary') {
-              leftVideoRef.current.srcObject = new MediaStream([videoTrack.mediaStreamTrack]);
-              leftVideoRef.current.muted = true;
-              leftVideoRef.current.play().catch(() => {});
-            }
           } catch (err) {
             console.error(`[${identity}] Failed to attach local video:`, err);
           }
@@ -524,12 +513,6 @@ export default function VideoRoom({
                 (track as any).attach(remoteVideoRef.current!);
                 remoteVideoRef.current!.playsInline = true;
                 
-                // Also attach to screen recording refs if provided
-                if (rightVideoRef?.current && role === 'notary') {
-                  rightVideoRef.current.srcObject = new MediaStream([track.mediaStreamTrack]);
-                  rightVideoRef.current.muted = true;
-                  rightVideoRef.current.play().catch(() => {});
-                }
               } catch {}
             };
             attach();
@@ -1046,14 +1029,6 @@ export default function VideoRoom({
       {/* Hidden Audio Elements */}
       <audio ref={localAudioRef} muted style={{ display: 'none' }} />
       <audio ref={remoteAudioRef} style={{ display: 'none' }} />
-      
-      {/* Hidden Video Elements for Screen Recording (Notary only) */}
-      {role === 'notary' && (
-        <>
-          <video ref={leftVideoRef} muted style={{ display: 'none' }} />
-          <video ref={rightVideoRef} muted style={{ display: 'none' }} />
-        </>
-      )}
     </div>
   );
 }
