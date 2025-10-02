@@ -40,7 +40,7 @@ export default function PdfFieldCollaborator({
   const [draggedFieldType, setDraggedFieldType] = useState<string | null>(null);
   
   // Use Yjs context
-  const { fields, approvals, usedFields, addField, updateField, deleteField, updateApproval, isConnected } = useYjs();
+  const { fields, approvals, usedFields, addField, updateField, deleteField, updateApproval, isConnected, doc } = useYjs();
 
   // Toolbar items
   const toolbarItems: FieldToolbarItem[] = [
@@ -314,6 +314,20 @@ export default function PdfFieldCollaborator({
     }
   }, [allApproved, fields, submitters]);
 
+  const handleClearAllFields = useCallback(() => {
+    if (!doc || !isNotary) return;
+    
+    console.log('Clear all fields clicked');
+    const fieldsMap = doc.getMap('fields');
+    const usedFieldsMap = doc.getMap('usedFields');
+    
+    // Clear all fields from Yjs maps
+    fieldsMap.clear();
+    usedFieldsMap.clear();
+    
+    console.log('All fields cleared');
+  }, [doc, isNotary]);
+
   return (
     <div className="flex h-full bg-white rounded-lg shadow-lg">
       {/* Main PDF Area */}
@@ -356,6 +370,21 @@ export default function PdfFieldCollaborator({
             >
               {approvals[submitterUuid] ? '✓ Approved' : 'Approve'}
             </button>
+            
+            {/* Clear All Fields Button */}
+            {isNotary && (
+              <button
+                onClick={handleClearAllFields}
+                disabled={fields.length === 0}
+                className={`px-4 py-2 rounded font-medium ${
+                  fields.length > 0
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                }`}
+              >
+                Clear All Fields
+              </button>
+            )}
             
             {/* Export Button */}
             <button

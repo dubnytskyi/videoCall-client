@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import * as Y from 'yjs';
 import { PdfField, ApprovalState } from '../types/pdfFields';
+import { getServerUrl } from '../config';
 
 interface YjsContextType {
   doc: Y.Doc | null;
@@ -36,7 +37,9 @@ export function YjsProvider({ children, roomId, submitterUuid }: YjsProviderProp
     setDoc(yDoc);
 
     // Create WebSocket connection
-    const ws = new WebSocket(`ws://localhost:1234?room=${roomId}`);
+    const serverUrl = getServerUrl();
+    const wsUrl = serverUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+    const ws = new WebSocket(`${wsUrl}?room=${roomId}`);
     // Ensure we receive ArrayBuffer instead of Blob on supported browsers
     try { (ws as any).binaryType = 'arraybuffer'; } catch {}
     
