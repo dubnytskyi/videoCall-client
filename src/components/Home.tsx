@@ -71,6 +71,32 @@ export default function Home() {
               </Link>
             </div>
             
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Test PDF Collaboration</h3>
+              <div className="space-y-2">
+                <Link
+                  to="/test-drag"
+                  className="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 block text-center"
+                >
+                  Test Drag & Drop (Simple)
+                </Link>
+                
+                <Link
+                  to="/test-notary"
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 block text-center"
+                >
+                  Test as Notary (PDF Editor)
+                </Link>
+                
+                <Link
+                  to="/test-client"
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 block text-center"
+                >
+                  Test as Client (PDF Viewer)
+                </Link>
+              </div>
+            </div>
+            
             <div className="mt-6 text-sm text-gray-500">
               <p>Make sure to configure your Twilio credentials in the server/.env file</p>
             </div>

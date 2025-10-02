@@ -1,18 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import VideoRoom from "./VideoRoom";
-import PdfCollaborator from "./PdfCollaborator";
-import ScreenCapture from "./ScreenCapture";
+import PdfFieldCollaborator from "./PdfFieldCollaborator";
+import TabCapture from "./TabCapture";
+import { YjsProvider } from "../contexts/YjsContext";
 import { fetchTwilioToken } from "../lib/twilioToken";
-import { CollabOp, Participant } from "../types/collab";
-import { LocalDataTrack } from "twilio-video";
+import { Participant } from "../types/collab";
 import { RecordingStatus } from "../lib/recordingService";
 import { getServerUrl } from "../config";
 
 export default function NotaryRoom() {
   const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(null);
-  const [localDataTrack, setLocalDataTrack] = useState<LocalDataTrack | null>(null);
   const [participantInfo, setParticipantInfo] = useState({
     notary: { identity: "Notary", isConnected: true, isReady: true },
     client: { identity: "Waiting...", isConnected: false, isReady: false }
@@ -20,20 +19,28 @@ export default function NotaryRoom() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
   const [isEndingCall, setIsEndingCall] = useState(false);
   const [isFinalizingRecording, setIsFinalizingRecording] = useState(false);
   
-  // Screen capture track
-  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+  // Tab capture tracks
+  const regionTrackRef = useRef<MediaStreamTrack | null>(null);
+  const fullTrackRef = useRef<MediaStreamTrack | null>(null);
+  const tabApiRef = useRef<{ start: () => Promise<void>; stop: () => void } | null>(null);
 
   // Stable identity that doesn't change on re-renders
   const identityRef = useRef<string | null>(null);
+  const roomIdRef = useRef<string | null>(null);
   
-  // Initialize identity only once
+  // Initialize identity and room ID only once
   useEffect(() => {
     if (!identityRef.current) {
       identityRef.current = `notary-${Math.random().toString(36).substr(2, 9)}`;
       console.log(`[NotaryRoom] Created identity: ${identityRef.current}`);
+    }
+    if (!roomIdRef.current) {
+      roomIdRef.current = `room-${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`[NotaryRoom] Created room ID: ${roomIdRef.current}`);
     }
   }, []);
 
@@ -60,17 +67,6 @@ export default function NotaryRoom() {
     getToken();
   }, []);
 
-  const handleLocalDataTrack = useCallback((track: LocalDataTrack) => {
-    console.log(`[NotaryRoom] Received LocalDataTrack:`, track);
-    console.log(`[NotaryRoom] Setting localDataTrack state to:`, !!track);
-    setLocalDataTrack(track);
-  }, []);
-
-  const handleRemoteData = useCallback((data: CollabOp) => {
-    // Notary receives data from client (if any)
-    console.log("Notary received data from client:", data);
-  }, []);
-
   const handleParticipantUpdate = useCallback((participant: Participant) => {
     setParticipantInfo(prev => ({
       ...prev,
@@ -80,12 +76,15 @@ export default function NotaryRoom() {
 
   const handleRecordingStatusChange = useCallback((status: RecordingStatus | null) => {
     console.log(`[NotaryRoom] Recording status change:`, status);
+    console.log(`[NotaryRoom] Recording status:`, status?.status);
     setRecordingStatus(status);
+    setIsRecording(status?.status === 'enqueued' || status?.status === 'in-progress');
   }, []);
 
-  const handleScreenTrack = useCallback((track: MediaStreamTrack | null) => {
-    console.log(`[NotaryRoom] Screen track change:`, !!track);
-    screenTrackRef.current = track;
+  const handleTabTracks = useCallback((regionTrack: MediaStreamTrack | null, fullTrack: MediaStreamTrack | null) => {
+    console.log(`[NotaryRoom] Tab tracks change:`, { region: !!regionTrack, full: !!fullTrack });
+    regionTrackRef.current = regionTrack;
+    fullTrackRef.current = fullTrack;
   }, []);
 
   const endCall = useCallback(async () => {
@@ -189,11 +188,19 @@ export default function NotaryRoom() {
           token={token}
           identity={identityRef.current || `notary-${Math.random().toString(36).substr(2, 9)}`}
           role="notary"
-          onLocalDataTrack={handleLocalDataTrack}
-          onRemoteData={handleRemoteData}
+          onLocalDataTrack={() => {}}
+          onRemoteData={() => {}}
           onParticipantUpdate={handleParticipantUpdate}
           onRecordingStatusChange={handleRecordingStatusChange}
-          canvasTrack={screenTrackRef.current}
+          canvasTrack={regionTrackRef.current}
+          screenFullTrack={fullTrackRef.current as any}
+          onCaptureToggle={async (active) => {
+            setIsRecording(active);
+            if (active && tabApiRef.current) {
+              // Start capture synchronously on user gesture
+              try { await tabApiRef.current.start(); } catch {}
+            }
+          }}
         />
         
         <div className="mt-4 p-3 bg-white rounded-lg shadow">
@@ -269,13 +276,19 @@ export default function NotaryRoom() {
 
       {/* Right Panel - PDF Document */}
       <div className="flex-1 p-4">
-        {localDataTrack ? (
-          <PdfCollaborator
-            localDataTrack={localDataTrack}
-            onRemoteData={handleRemoteData}
-            isNotary={true}
-            participantInfo={participantInfo}
-          />
+        {roomIdRef.current ? (
+          <YjsProvider roomId={roomIdRef.current} submitterUuid={identityRef.current || ''}>
+            <PdfFieldCollaborator
+              isNotary={true}
+              participantInfo={participantInfo}
+              submitterUuid={identityRef.current || ''}
+              submitterName="Notary"
+              submitters={[
+                { name: "Notary", uuid: identityRef.current || '' },
+                { name: "Client", uuid: participantInfo.client.identity }
+              ]}
+            />
+          </YjsProvider>
         ) : (
           <div className="h-full flex items-center justify-center bg-white rounded-lg shadow">
             <div className="text-center">
@@ -286,10 +299,12 @@ export default function NotaryRoom() {
         )}
       </div>
 
-      {/* Screen Capture - records the entire screen */}
-      <ScreenCapture
-        onScreenTrack={handleScreenTrack}
-        isRecording={recordingStatus?.status === 'in-progress'}
+      {/* Tab Capture - produces region (DocuSeal area) + full (entire tab) */}
+      <TabCapture
+        onTracks={handleTabTracks}
+        isRecording={isRecording}
+        cropSelector="#docuseal-root"
+        onReady={(api) => { tabApiRef.current = api; }}
       />
     </div>
   );

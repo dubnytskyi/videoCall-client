@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+
+export type ScreenCaptureHandle = {
+  start: () => Promise<void>;
+  stop: () => void;
+  isCapturing: () => boolean;
+};
 
 type Props = {
   // Callback to provide the screen track
@@ -8,10 +14,10 @@ type Props = {
   isRecording: boolean;
 };
 
-export default function ScreenCapture({
+const ScreenCapture = forwardRef<ScreenCaptureHandle, Props>(function ScreenCapture({
   onScreenTrack,
   isRecording
-}: Props) {
+}: Props, ref) {
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +71,19 @@ export default function ScreenCapture({
     onScreenTrack(null);
   }, [onScreenTrack]);
 
+  // Expose imperative API to parent components (for user-gesture initiated starts)
+  useImperativeHandle(ref, () => ({
+    start: startScreenCapture,
+    stop: stopScreenCapture,
+    isCapturing: () => isCapturing,
+  }), [startScreenCapture, stopScreenCapture, isCapturing]);
+
+  // Auto-start screen capture when component mounts (for notary)
+  useEffect(() => {
+    console.log('[ScreenCapture] Component mounted, auto-starting screen capture');
+    startScreenCapture();
+  }, [startScreenCapture]);
+
   // Start/stop based on recording state
   useEffect(() => {
     console.log('[ScreenCapture] Recording state changed:', { isRecording, isCapturing });
@@ -105,12 +124,17 @@ export default function ScreenCapture({
         </div>
         
         {!isCapturing && (
-          <button
-            onClick={startScreenCapture}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
-          >
-            Start Screen Sharing
-          </button>
+          <div className="text-sm text-gray-600">
+            <p className="text-xs text-gray-500">
+              Screen sharing will start automatically when you begin recording
+            </p>
+            <button
+              onClick={startScreenCapture}
+              className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
+            >
+              Start Screen Sharing Now
+            </button>
+          </div>
         )}
         
         {isCapturing && (
@@ -124,4 +148,6 @@ export default function ScreenCapture({
       </div>
     </div>
   );
-}
+});
+
+export default ScreenCapture;

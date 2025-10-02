@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import VideoRoom from "./VideoRoom";
-import PdfCollaborator from "./PdfCollaborator";
+import PdfFieldCollaborator from "./PdfFieldCollaborator";
+import { YjsProvider } from "../contexts/YjsContext";
 import { fetchTwilioToken } from "../lib/twilioToken";
 import { CollabOp, Participant } from "../types/collab";
 import { LocalDataTrack } from "twilio-video";
@@ -24,12 +25,17 @@ export default function ClientRoom() {
   
   // Stable identity that doesn't change on re-renders
   const identityRef = useRef<string | null>(null);
+  const roomIdRef = useRef<string | null>(null);
   
-  // Initialize identity only once
+  // Initialize identity and room ID only once
   useEffect(() => {
     if (!identityRef.current) {
       identityRef.current = `client-${Math.random().toString(36).substr(2, 9)}`;
       console.log(`[ClientRoom] Created identity: ${identityRef.current}`);
+    }
+    if (!roomIdRef.current) {
+      roomIdRef.current = `room-${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`[ClientRoom] Created room ID: ${roomIdRef.current}`);
     }
   }, []);
 
@@ -169,14 +175,19 @@ export default function ClientRoom() {
 
       {/* Right Panel - Document View */}
       <div className="flex-1 p-4">
-        {localDataTrack ? (
-          <PdfCollaborator
-            localDataTrack={localDataTrack}
-            onRemoteData={handleRemoteData}
-            isNotary={false}
-            participantInfo={participantInfo}
-            remoteData={remoteData}
-          />
+        {roomIdRef.current ? (
+          <YjsProvider roomId={roomIdRef.current} submitterUuid={identityRef.current || ''}>
+            <PdfFieldCollaborator
+              isNotary={false}
+              participantInfo={participantInfo}
+              submitterUuid={identityRef.current || ''}
+              submitterName="Client"
+              submitters={[
+                { name: "Notary", uuid: participantInfo.notary.identity },
+                { name: "Client", uuid: identityRef.current || '' }
+              ]}
+            />
+          </YjsProvider>
         ) : (
           <div className="h-full flex items-center justify-center bg-white rounded-lg shadow">
             <div className="text-center">

@@ -18,10 +18,15 @@ type Props = {
   onLocalDataTrack: (track: LocalDataTrack) => void;
   onRemoteData: (data: CollabOp) => void;
   onParticipantUpdate: (participant: Participant) => void;
+  // region-cropped track to show live to client
   canvasTrack?: any;
+  // full-screen track to record
+  screenFullTrack?: MediaStreamTrack | null;
   onRecordingStatusChange?: (status: RecordingStatus | null) => void;
   // Optional ref to an external <video> element for rendering the pdf-canvas track (client side)
   pdfVideoElRef?: RefObject<HTMLVideoElement>;
+  // Immediately toggle screen capture (TabCapture) before server call
+  onCaptureToggle?: (active: boolean) => void;
 };
 
 export default function VideoRoom({ 
@@ -32,8 +37,10 @@ export default function VideoRoom({
   onRemoteData, 
   onParticipantUpdate,
   canvasTrack,
+  screenFullTrack,
   onRecordingStatusChange,
-  pdfVideoElRef
+  pdfVideoElRef,
+  onCaptureToggle
 }: Props) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -62,6 +69,7 @@ export default function VideoRoom({
   const onRemoteDataRef = useRef(onRemoteData);
   const onParticipantUpdateRef = useRef(onParticipantUpdate);
   const canvasTrackRef = useRef(canvasTrack);
+  const screenFullTrackRef = useRef<MediaStreamTrack | null>(screenFullTrack || null);
 
   // Update refs when props change
   useEffect(() => {
@@ -69,6 +77,7 @@ export default function VideoRoom({
     onRemoteDataRef.current = onRemoteData;
     onParticipantUpdateRef.current = onParticipantUpdate;
     canvasTrackRef.current = canvasTrack;
+    screenFullTrackRef.current = screenFullTrack || null;
   });
 
   // Toggle microphone
@@ -163,6 +172,8 @@ export default function VideoRoom({
     try {
       setRecordingError(null);
       console.log(`[${identity}] Starting recording for room:`, room.sid);
+      // Trigger TabCapture immediately (browser prompt) before server call
+      try { onCaptureToggle && onCaptureToggle(true); } catch {}
       
       // CRITICAL: Wait for canvas track to be available before starting recording
       if (!canvasTrackRef.current) {
@@ -183,7 +194,7 @@ export default function VideoRoom({
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
-      // CRITICAL: Ensure canvas track is published BEFORE starting composition
+      // CRITICAL: Ensure tracks are published BEFORE starting composition
       // Only publish canvas track if we have one and it's not already published
       if (canvasTrackRef.current && !publishedCanvasTrackSidRef.current) {
         try {
@@ -195,8 +206,8 @@ export default function VideoRoom({
             readyState: canvasTrackRef.current.readyState
           });
           
-          const localCanvas = new LocalVideoTrack(canvasTrackRef.current, { name: 'pdf-canvas' } as any);
-          const pub: any = await room.localParticipant.publishTrack(localCanvas, { name: 'pdf-canvas', priority: 'high' } as any);
+          const localCanvas = new LocalVideoTrack(canvasTrackRef.current, { name: 'docuseal-region' } as any);
+          const pub: any = await room.localParticipant.publishTrack(localCanvas, { name: 'docuseal-region', priority: 'high' } as any);
           publishedCanvasTrackSidRef.current = pub?.trackSid || null;
           console.log(`[${identity}] Canvas track published (pre-record):`, publishedCanvasTrackSidRef.current);
           
@@ -221,6 +232,19 @@ export default function VideoRoom({
         console.error(`[${identity}] Still no canvas track available after waiting! Recording without PDF.`);
       } else {
         console.log(`[${identity}] Canvas track already published:`, publishedCanvasTrackSidRef.current);
+      }
+
+      // Publish full-screen track (for recording) if present
+      if (screenFullTrackRef.current) {
+        try {
+          console.log(`[${identity}] Publishing full-screen track for recording...`);
+          const fullLocal = new LocalVideoTrack(screenFullTrackRef.current, { name: 'screen-full' } as any);
+          await room.localParticipant.publishTrack(fullLocal, { name: 'screen-full', priority: 'low' } as any);
+          // Give Twilio some time to index the track
+          await new Promise(r => setTimeout(r, 800));
+        } catch (e) {
+          console.warn(`[${identity}] Failed to publish screen-full track`, e);
+        }
       }
 
       const status = await recordingService.startRecording(room.sid);
@@ -479,12 +503,12 @@ export default function VideoRoom({
             hasMediaStreamTrack: !!track.mediaStreamTrack
           });
 
-          // Route pdf-canvas to a dedicated element (external ref preferred, fallback to internal)
+          // Route docuseal-region (or legacy pdf-canvas) to a dedicated element (external ref preferred, fallback to internal)
           const trackName = (track as any)?.name || (track as any)?.trackName;
-          if (track.kind === 'video' && trackName === 'pdf-canvas') {
+          if (track.kind === 'video' && (trackName === 'docuseal-region' || trackName === 'pdf-canvas')) {
             const targetPdfEl = pdfVideoElRef?.current || internalPdfVideoRef.current;
             if (targetPdfEl) {
-              console.log(`[${identity}] Attaching pdf-canvas to dedicated PDF video element`);
+              console.log(`[${identity}] Attaching region track to dedicated PDF video element:`, trackName);
               try {
                 (track as any).attach(targetPdfEl);
                 targetPdfEl.playsInline = true;
@@ -500,7 +524,7 @@ export default function VideoRoom({
                 try { track.setContentPreferences({ renderDimensions: { width: 640, height: 720 }, frameRate: 24 }); } catch {}
               }
             } else {
-              console.warn(`[${identity}] No PDF video element available to attach pdf-canvas`);
+              console.warn(`[${identity}] No PDF video element available to attach region track`);
             }
             return; // Do not fall through to main remote video
           }
@@ -751,8 +775,8 @@ export default function VideoRoom({
       if (publishedCanvasTrackSidRef.current) return; // already published
       try {
         console.log(`[${identity}] Publishing canvas track post-connect (as LocalVideoTrack)`);
-        const localCanvas = new LocalVideoTrack(canvasTrackRef.current, { name: 'pdf-canvas' } as any);
-        const pub: any = await room.localParticipant.publishTrack(localCanvas, { name: 'pdf-canvas', priority: 'high' } as any);
+        const localCanvas = new LocalVideoTrack(canvasTrackRef.current, { name: 'docuseal-region' } as any);
+        const pub: any = await room.localParticipant.publishTrack(localCanvas, { name: 'docuseal-region', priority: 'high' } as any);
         publishedCanvasTrackSidRef.current = pub?.trackSid || null;
         console.log(`[${identity}] Canvas track published post-connect`, publishedCanvasTrackSidRef.current);
       } catch (e) {
