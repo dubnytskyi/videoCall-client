@@ -11,14 +11,12 @@ import { RecordingStatus } from "../lib/recordingService";
 export default function ClientRoom() {
   const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(null);
-  const [localDataTrack, setLocalDataTrack] = useState<LocalDataTrack | null>(null);
   const [participantInfo, setParticipantInfo] = useState({
     notary: { identity: "Waiting...", isConnected: false, isReady: false },
     client: { identity: "Client", isConnected: true, isReady: true }
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [remoteData, setRemoteData] = useState<CollabOp | null>(null);
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
   // Dedicated video element for pdf-canvas
   const pdfVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -58,13 +56,13 @@ export default function ClientRoom() {
 
   const handleLocalDataTrack = useCallback((track: LocalDataTrack) => {
     console.log(`[ClientRoom] Received LocalDataTrack:`, track);
-    setLocalDataTrack(track);
+    // No longer needed - using Yjs for collaboration
   }, []);
 
   const handleRemoteData = useCallback((data: CollabOp) => {
     // Client receives data from notary
     console.log("Client received data from notary:", data);
-    setRemoteData(data);
+    // No longer needed - using Yjs for collaboration
   }, []);
 
   const handleParticipantUpdate = useCallback((participant: Participant) => {

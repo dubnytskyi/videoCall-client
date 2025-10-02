@@ -14,6 +14,12 @@ export function createPdfTemplate(
   submitters: PdfSubmitter[],
   templateName: string = "Sample Local PDF"
 ): ExportData {
+  console.log("createPdfTemplate called with:", {
+    fields: fields.length,
+    submitters: submitters.length,
+    templateName,
+  });
+
   // Create schema for the PDF attachment
   const schema: PdfSchema[] = [
     {
@@ -29,6 +35,7 @@ export function createPdfTemplate(
     fields,
   };
 
+  console.log("Template created:", template);
   return { template };
 }
 

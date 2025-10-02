@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Rnd } from 'react-rnd';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -23,7 +23,7 @@ export default function TestDragDrop() {
     { id: 'checkbox', title: 'Checkbox', icon: '☑️' }
   ];
 
-  const handleDragStart = (e: React.DragEvent, fieldType: string) => {
+  const handleDragStart = (_: React.DragEvent, fieldType: string) => {
     console.log('Drag start:', fieldType);
     setDraggedFieldType(fieldType);
   };

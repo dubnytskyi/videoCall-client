@@ -279,17 +279,23 @@ export default function PdfFieldCollaborator({
 
   // Handle export
   const handleExport = useCallback(async () => {
+    console.log('Export button clicked:', { allApproved, fieldsCount: fields.length, submittersCount: submitters.length });
+    
     if (!allApproved) {
       alert('All participants must approve before exporting');
       return;
     }
 
     try {
+      console.log('Creating PDF template...');
       const templateData = createPdfTemplate(fields, submitters);
+      console.log('Template data created:', templateData);
       
       // Try to send to backend first
       try {
+        console.log('Sending to backend...');
         const response = await sendToBackend(templateData);
+        console.log('Backend response:', response);
         if (response.ok) {
           alert('Template successfully saved to backend!');
         } else {
@@ -298,6 +304,7 @@ export default function PdfFieldCollaborator({
       } catch (error) {
         console.warn('Backend save failed, downloading locally:', error);
         // Fallback: download locally
+        console.log('Downloading locally...');
         downloadJson(templateData);
         alert('Template downloaded locally (backend unavailable)');
       }

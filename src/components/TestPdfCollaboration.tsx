@@ -1,4 +1,3 @@
-import React from 'react';
 import { YjsProvider } from '../contexts/YjsContext';
 import PdfFieldCollaborator from './PdfFieldCollaborator';
 
