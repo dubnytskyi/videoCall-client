@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import VideoRoom from "./VideoRoom";
 import PdfFieldCollaborator from "./PdfFieldCollaborator";
 import TabCapture from "./TabCapture";
@@ -30,7 +30,11 @@ export default function NotaryRoom() {
 
   // Stable identity that doesn't change on re-renders
   const identityRef = useRef<string | null>(null);
-  const roomIdRef = useRef<string | null>(null);
+  const location = useLocation();
+  const yjsRoomId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('room') || 'test-room';
+  }, [location.search]);
   
   // Initialize identity and room ID only once
   useEffect(() => {
@@ -38,10 +42,7 @@ export default function NotaryRoom() {
       identityRef.current = `notary-${Math.random().toString(36).substr(2, 9)}`;
       console.log(`[NotaryRoom] Created identity: ${identityRef.current}`);
     }
-    if (!roomIdRef.current) {
-      roomIdRef.current = `room-${Math.random().toString(36).substr(2, 9)}`;
-      console.log(`[NotaryRoom] Created room ID: ${roomIdRef.current}`);
-    }
+    console.log(`[NotaryRoom] Using Yjs room ID: ${yjsRoomId}`);
   }, []);
 
   useEffect(() => {
@@ -276,8 +277,8 @@ export default function NotaryRoom() {
 
       {/* Right Panel - PDF Document */}
       <div className="flex-1 p-4">
-        {roomIdRef.current ? (
-          <YjsProvider roomId={roomIdRef.current} submitterUuid={identityRef.current || ''}>
+        {yjsRoomId ? (
+          <YjsProvider roomId={yjsRoomId} submitterUuid={identityRef.current || ''}>
             <PdfFieldCollaborator
               isNotary={true}
               participantInfo={participantInfo}

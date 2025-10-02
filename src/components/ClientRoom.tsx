@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import VideoRoom from "./VideoRoom";
 import PdfFieldCollaborator from "./PdfFieldCollaborator";
 import { YjsProvider } from "../contexts/YjsContext";
@@ -23,7 +23,11 @@ export default function ClientRoom() {
   
   // Stable identity that doesn't change on re-renders
   const identityRef = useRef<string | null>(null);
-  const roomIdRef = useRef<string | null>(null);
+  const location = useLocation();
+  const yjsRoomId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('room') || 'test-room';
+  }, [location.search]);
   
   // Initialize identity and room ID only once
   useEffect(() => {
@@ -31,10 +35,7 @@ export default function ClientRoom() {
       identityRef.current = `client-${Math.random().toString(36).substr(2, 9)}`;
       console.log(`[ClientRoom] Created identity: ${identityRef.current}`);
     }
-    if (!roomIdRef.current) {
-      roomIdRef.current = `room-${Math.random().toString(36).substr(2, 9)}`;
-      console.log(`[ClientRoom] Created room ID: ${roomIdRef.current}`);
-    }
+    console.log(`[ClientRoom] Using Yjs room ID: ${yjsRoomId}`);
   }, []);
 
   useEffect(() => {
@@ -173,8 +174,8 @@ export default function ClientRoom() {
 
       {/* Right Panel - Document View */}
       <div className="flex-1 p-4">
-        {roomIdRef.current ? (
-          <YjsProvider roomId={roomIdRef.current} submitterUuid={identityRef.current || ''}>
+        {yjsRoomId ? (
+          <YjsProvider roomId={yjsRoomId} submitterUuid={identityRef.current || ''}>
             <PdfFieldCollaborator
               isNotary={false}
               participantInfo={participantInfo}
