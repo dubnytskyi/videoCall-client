@@ -37,6 +37,8 @@ export function YjsProvider({ children, roomId, submitterUuid }: YjsProviderProp
 
     // Create WebSocket connection
     const ws = new WebSocket(`ws://localhost:1234?room=${roomId}`);
+    // Ensure we receive ArrayBuffer instead of Blob on supported browsers
+    try { (ws as any).binaryType = 'arraybuffer'; } catch {}
     
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -54,12 +56,25 @@ export function YjsProvider({ children, roomId, submitterUuid }: YjsProviderProp
     };
 
     ws.onmessage = (event) => {
-      try {
-        // Yjs sends binary data
-        const update = new Uint8Array(event.data);
-        Y.applyUpdate(yDoc, update);
-      } catch (error) {
-        console.error('Error applying Yjs update:', error);
+      const apply = (buf: ArrayBuffer) => {
+        try {
+          const update = new Uint8Array(buf);
+          Y.applyUpdate(yDoc, update);
+        } catch (error) {
+          console.error('Error applying Yjs update:', error);
+        }
+      };
+
+      const data = event.data as unknown;
+      if (data instanceof ArrayBuffer) {
+        apply(data);
+      } else if (data instanceof Blob) {
+        (data as Blob).arrayBuffer().then(apply).catch((err) => {
+          console.error('Failed to read WS Blob data:', err);
+        });
+      } else {
+        // Some environments might send strings (shouldn't happen for Y updates)
+        console.warn('Unexpected WS message type; ignoring', { type: typeof data });
       }
     };
 
