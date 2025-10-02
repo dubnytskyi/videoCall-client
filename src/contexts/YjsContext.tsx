@@ -79,6 +79,7 @@ export function YjsProvider({ children, roomId, submitterUuid }: YjsProviderProp
 
     // Listen for changes
     const updateFields = () => {
+      console.log('updateFields called - Yjs fields map changed');
       const fieldsArray: PdfField[] = [];
       fieldsMap.forEach((field: any) => {
         // Field is already a plain object, not a Yjs structure
@@ -100,6 +101,7 @@ export function YjsProvider({ children, roomId, submitterUuid }: YjsProviderProp
     };
 
     const updateUsedFields = () => {
+      console.log('updateUsedFields called - Yjs used fields map changed');
       const usedFieldsObj = new Map<string, string>();
       usedFieldsMap.forEach((submitterUuid: any, fieldType: string) => {
         usedFieldsObj.set(fieldType, submitterUuid);
@@ -156,15 +158,24 @@ export function YjsProvider({ children, roomId, submitterUuid }: YjsProviderProp
   }, [doc]);
 
   const deleteField = useCallback((fieldId: string) => {
-    if (!doc) return;
+    console.log('YjsContext deleteField called:', { fieldId, doc: !!doc });
+    if (!doc) {
+      console.log('No Yjs document available');
+      return;
+    }
     
     const fieldsMap = doc.getMap('fields');
     const usedFieldsMap = doc.getMap('usedFields');
     const field = fieldsMap.get(fieldId);
     
     if (field) {
+      console.log('Deleting field:', { fieldId, fieldType: (field as any).type });
       fieldsMap.delete(fieldId);
-      usedFieldsMap.delete((field as any).toJSON().type);
+      // Field is already a plain object, not a Yjs structure
+      usedFieldsMap.delete((field as any).type);
+      console.log('Field deleted successfully');
+    } else {
+      console.log('Field not found:', fieldId);
     }
   }, [doc]);
 

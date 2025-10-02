@@ -438,13 +438,20 @@ export default function PdfFieldCollaborator({
                     }}
                     enableResizing={isNotary}
                     disableDragging={!isNotary}
+                    resizeHandleStyles={{
+                      topRight: { zIndex: 1 }
+                    }}
                   >
                     <div className="w-full h-full border-2 border-blue-500 bg-blue-100 bg-opacity-50 flex items-center justify-center text-xs font-medium text-blue-800 cursor-move">
                       {field.title}
                       {isNotary && (
                         <button
-                          onClick={() => deleteField(field.id)}
-                          className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 text-white rounded-full text-xs hover:bg-red-600"
+                          onClick={() => {
+                            console.log('Delete button clicked for field:', field.id, field.type);
+                            deleteField(field.id);
+                          }}
+                          className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 z-50"
+                          style={{ zIndex: 9999 }}
                         >
                           ×
                         </button>
