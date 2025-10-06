@@ -45,8 +45,11 @@ export function YjsProvider({ children, roomId, submitterUuid }: YjsProviderProp
     const wsServerUrl = isProduction 
       ? wsUrl  // Production: same port as HTTP
       : wsUrl.replace(':4000', ':1234');  // Development: port 1234
-    console.log('YjsContext: Connecting to WebSocket:', `${wsServerUrl}?room=${roomId}`, { isProduction, serverUrl, wsUrl });
-    const ws = new WebSocket(`${wsServerUrl}?room=${roomId}`);
+    // Fix URL construction - remove trailing slash if present
+    const cleanWsUrl = wsServerUrl.replace(/\/$/, '');
+    const fullWsUrl = `${cleanWsUrl}?room=${roomId}`;
+    console.log('YjsContext: Connecting to WebSocket:', fullWsUrl, { isProduction, serverUrl, wsUrl, cleanWsUrl });
+    const ws = new WebSocket(fullWsUrl);
     // Ensure we receive ArrayBuffer instead of Blob on supported browsers
     try { (ws as any).binaryType = 'arraybuffer'; } catch {}
     
