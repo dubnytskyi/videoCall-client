@@ -39,7 +39,14 @@ export function YjsProvider({ children, roomId, submitterUuid }: YjsProviderProp
     // Create WebSocket connection
     const serverUrl = getServerUrl();
     const wsUrl = serverUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-    const ws = new WebSocket(`${wsUrl}?room=${roomId}`);
+    // In production (Railway), WebSocket runs on the same port as HTTP server
+    // In development, WebSocket runs on port 1234
+    const isProduction = wsUrl.includes('vercel.app') || wsUrl.includes('railway.app');
+    const wsServerUrl = isProduction 
+      ? wsUrl  // Production: same port as HTTP
+      : wsUrl.replace(':4000', ':1234');  // Development: port 1234
+    console.log('YjsContext: Connecting to WebSocket:', `${wsServerUrl}?room=${roomId}`, { isProduction, serverUrl, wsUrl });
+    const ws = new WebSocket(`${wsServerUrl}?room=${roomId}`);
     // Ensure we receive ArrayBuffer instead of Blob on supported browsers
     try { (ws as any).binaryType = 'arraybuffer'; } catch {}
     

@@ -15,6 +15,6 @@ export const config = {
 
 // Helper function to get server URL
 export function getServerUrl(): string {
-  // Always use Vercel server for development and production
-  return "https://video-call-azure-two.vercel.app";
+  // Use Railway server for production
+  return "https://videocall-production-3a01.up.railway.app";
 }
